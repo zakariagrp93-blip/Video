@@ -74,6 +74,7 @@ export const MOTIFS = [
   'gym',
   'crowd',
   'desk',
+  'steps',
 ] as const;
 export type Motif = (typeof MOTIFS)[number];
 

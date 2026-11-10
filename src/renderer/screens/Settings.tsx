@@ -94,6 +94,16 @@ export function SettingsScreen() {
               ]}
             />
           </Field>
+          <Field label="Chart style" hint="Minimal: one white line that draws itself, a tip dot and a landing ring (style from claude-animation-skills /graph).">
+            <Select
+              value={s.chartStyle}
+              onChange={(v) => save({ chartStyle: v })}
+              options={[
+                { value: 'minimal', label: 'Minimal line (self-drawing)' },
+                { value: 'classic', label: 'Classic (boxed, coloured)' },
+              ]}
+            />
+          </Field>
           <CustomIconsField dir={s.customIconsDir} onChoose={(d) => save({ customIconsDir: d })} />
           <Field label="Voice (TTS)" hint={s.ttsProvider === 'piper' ? 'Local neural voices, offline after a one-time download. Subtitles are aligned on detected pauses.' : s.ttsProvider === 'elevenlabs' ? 'Returns character timestamps for exact subtitle timing.' : s.ttsProvider === 'fishaudio' ? 'Expressive cloud voices (model S2.1). No timestamps; subtitles aligned on detected pauses.' : 'No timestamps; subtitles aligned on detected pauses.'}>
             <Select

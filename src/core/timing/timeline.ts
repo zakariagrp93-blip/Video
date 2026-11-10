@@ -11,6 +11,7 @@ export interface TimelineOptions {
   snap?: (sec: number) => number;
   banner?: string;
   iconTone?: 'color' | 'muted' | 'mono';
+  chartStyle?: 'minimal' | 'classic';
   brand?: { name: string; accent: string; danger: string } | null;
   images?: Record<string, string>;
 }
@@ -66,6 +67,7 @@ export function buildVideoPlan(storyboard: Storyboard, narration: NarrationManif
     captionMode: opts.captionMode ?? 'karaoke',
     banner: opts.banner ? opts.banner.slice(0, 140) : undefined,
     iconTone: opts.iconTone ?? 'color',
+    ...(opts.chartStyle ? { chartStyle: opts.chartStyle } : {}),
     ...(opts.mode === 'edit' ? { mode: 'edit' as const, beat: opts.beat } : {}),
     scenes,
     captions,

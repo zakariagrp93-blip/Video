@@ -5,7 +5,7 @@ import type { Language } from '../shared/constants';
 import type { PlannedScene, SceneProp } from '../shared/schemas';
 import { cameraTransform, characterMotion, propTransform, toCss, transitionStyle } from './anim';
 import { BackgroundLayer } from './Backgrounds';
-import { ChartView } from './Chart';
+import { ChartView, MinimalGraphView } from './Chart';
 import { EffectLayer } from './Effects';
 import { FONT_FAMILY } from './fonts';
 import { TALL, type StageLayout } from './layout';
@@ -72,6 +72,7 @@ export interface SceneViewProps {
   talking: (absoluteFrame: number) => boolean;
   layout?: StageLayout;
   iconTone?: 'color' | 'muted' | 'mono';
+  chartStyle?: 'minimal' | 'classic';
 }
 
 /** In "mono", money and signals keep their colour (as in cinematic finance stories); objects go white/grey. */
@@ -84,7 +85,7 @@ const TONE_FILTER: Record<'color' | 'muted' | 'mono', string> = {
   mono: 'grayscale(1) brightness(1.18) contrast(1.06)',
 };
 
-export const SceneView: React.FC<SceneViewProps> = ({ scene, nextTransition, frame, fps, theme, lang, images, talking, layout = TALL, iconTone = 'color' }) => {
+export const SceneView: React.FC<SceneViewProps> = ({ scene, nextTransition, frame, fps, theme, lang, images, talking, layout = TALL, iconTone = 'color', chartStyle = 'classic' }) => {
   const L = layout;
   const dur = scene.durationInFrames;
   const ch = scene.character;
@@ -114,7 +115,11 @@ export const SceneView: React.FC<SceneViewProps> = ({ scene, nextTransition, fra
       <BackgroundLayer kind={scene.background} frame={frame} anchorX={charX} width={L.width} height={L.height} baselineY={L.baselineY} scale={L.charScale / TALL.charScale} />
       <AbsoluteFill style={{ transform: toCss(cam), transformOrigin: `${charX}px ${pivotY}px` }}>
         {chartBox && scene.chart && (
-          <ChartView chart={scene.chart} frame={frame} fps={fps} x={chartBox.x} y={chartBox.y} width={chartBox.w} height={chartBox.h} positive={theme.positive} danger={theme.danger} accent={theme.accent} />
+          chartStyle === 'minimal' ? (
+            <MinimalGraphView chart={scene.chart} frame={frame} fps={fps} x={chartBox.x} y={chartBox.y} width={chartBox.w} height={chartBox.h} danger={theme.danger} scale={L.name === 'cinema' ? 1.7 : 1} />
+          ) : (
+            <ChartView chart={scene.chart} frame={frame} fps={fps} x={chartBox.x} y={chartBox.y} width={chartBox.w} height={chartBox.h} positive={theme.positive} danger={theme.danger} accent={theme.accent} />
+          )
         )}
         {props
           .filter((p) => p.prop.placement !== 'bottom' && p.prop.placement !== 'hand')

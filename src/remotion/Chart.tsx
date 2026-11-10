@@ -68,3 +68,115 @@ export const ChartView: React.FC<{ chart: Chart; frame: number; fps: number; x: 
     </div>
   );
 };
+
+/* ------------------------------------------------------------------ */
+/* Minimal graph — style adapted from "claude-animation-skills" /graph  */
+/* (MIT, Artem Novitckii): one smooth hairline drawing itself, a tip     */
+/* dot, a soft landing ring and a dotted drop; no box, no colour chips.  */
+/* ------------------------------------------------------------------ */
+
+/** Catmull-Rom through the points, sampled into a dense polyline with cumulative lengths. */
+export function smoothPath(points: Array<[number, number]>, samplesPerSegment = 24): { pts: Array<[number, number]>; cum: number[] } {
+  const pts: Array<[number, number]> = [points[0]!];
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[Math.max(0, i - 1)]!;
+    const p1 = points[i]!;
+    const p2 = points[i + 1]!;
+    const p3 = points[Math.min(points.length - 1, i + 2)]!;
+    const k = 0.5 / 3;
+    const c1: [number, number] = [p1[0] + (p2[0] - p0[0]) * k, p1[1] + (p2[1] - p0[1]) * k];
+    const c2: [number, number] = [p2[0] - (p3[0] - p1[0]) * k, p2[1] - (p3[1] - p1[1]) * k];
+    for (let s = 1; s <= samplesPerSegment; s++) {
+      const t = s / samplesPerSegment;
+      const u = 1 - t;
+      pts.push([
+        u * u * u * p1[0] + 3 * u * u * t * c1[0] + 3 * u * t * t * c2[0] + t * t * t * p2[0],
+        u * u * u * p1[1] + 3 * u * u * t * c1[1] + 3 * u * t * t * c2[1] + t * t * t * p2[1],
+      ]);
+    }
+  }
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1]! + Math.hypot(pts[i]![0] - pts[i - 1]![0], pts[i]![1] - pts[i - 1]![1]));
+  return { pts, cum };
+}
+
+function pointAt(path: { pts: Array<[number, number]>; cum: number[] }, len: number): [number, number] {
+  const { pts, cum } = path;
+  if (len <= 0) return pts[0]!;
+  const total = cum[cum.length - 1]!;
+  if (len >= total) return pts[pts.length - 1]!;
+  let i = 1;
+  while (cum[i]! < len) i++;
+  const t = (len - cum[i - 1]!) / (cum[i]! - cum[i - 1]! || 1);
+  return [pts[i - 1]![0] + (pts[i]![0] - pts[i - 1]![0]) * t, pts[i - 1]![1] + (pts[i]![1] - pts[i - 1]![1]) * t];
+}
+
+const easeInOutSine = (t: number) => 0.5 - 0.5 * Math.cos(Math.PI * t);
+
+export const MinimalGraphView: React.FC<{ chart: Chart; frame: number; fps: number; x: number; y: number; width: number; height: number; danger: string; scale?: number }> = ({ chart, frame, fps, x, y, width, height, danger, scale = 1 }) => {
+  const vals = chart.values.map((v) => Math.max(0, v));
+  const vmax = Math.max(...vals) || 1;
+  const s = scale;
+  const left = 10 * s;
+  const right = width - 10 * s;
+  const top = 30 * s;
+  const base = height - 60 * s;
+  const px = (i: number) => left + (i * (right - left)) / Math.max(1, vals.length - 1);
+  const py = (v: number) => base - (v / vmax) * (base - top);
+  const f = (t: number) => frame / fps - t;
+  const grid = (delay: number) => interpolate(f(delay), [0, 0.45], [0, 1], { ...clamp, easing: EASE_OUT });
+  const stroke = '#F4F4F4';
+  const gridColor = 'rgba(255,255,255,0.16)';
+
+  if (chart.kind === 'bar') {
+    const n = vals.length;
+    const bw = Math.min(110 * s, ((right - left) / n) * 0.62);
+    return (
+      <div style={{ position: 'absolute', left: x, top: y, width, height }}>
+        <svg width={width} height={height} style={{ overflow: 'visible' }}>
+          <line x1={left} y1={base} x2={left + (right - left) * grid(0)} y2={base} stroke={stroke} strokeWidth={2 * s} />
+          {vals.map((v, i) => {
+            const p = interpolate(f(0.3 + i * 0.12), [0, 0.3], [0, 1], { ...clamp, easing: EASE_OUT });
+            const h = (base - py(v)) * p;
+            const bx = left + (i + 0.5) * ((right - left) / n) - bw / 2;
+            return <rect key={i} x={bx} y={base - h} width={bw} height={h} fill="none" stroke={stroke} strokeWidth={2.6 * s} opacity={0.45 + 0.55 * ((i + 1) / n)} />;
+          })}
+        </svg>
+        {chart.label && <GraphLabel text={chart.label} s={s} />}
+      </div>
+    );
+  }
+
+  const path = smoothPath(vals.map((v, i) => [px(i), py(v)]));
+  const total = path.cum[path.cum.length - 1]!;
+  const T0 = 0.3;
+  const TD = 2.2;
+  const p = easeInOutSine(interpolate(f(T0), [0, TD], [0, 1], clamp));
+  const drawn = p * total;
+  const tip = pointAt(path, Math.max(0.01, drawn));
+  const visible = path.pts.filter((_, i) => path.cum[i]! <= drawn);
+  visible.push(tip);
+  const landed = f(T0 + TD);
+  const halo = interpolate(landed, [0, 0.7], [0, 1], { ...clamp, easing: EASE_OUT });
+  const drop = interpolate(landed, [0.05, 0.5], [0, 1], { ...clamp, easing: EASE_IN_OUT });
+  const tipColor = chart.trend === 'down' ? danger : stroke;
+  return (
+    <div style={{ position: 'absolute', left: x, top: y, width, height }}>
+      <svg width={width} height={height} style={{ overflow: 'visible' }}>
+        {[base - (base - top) / 2, top].map((gy, i) => (
+          <line key={i} x1={left} y1={gy} x2={left + (right - left) * grid(0.06 * (i + 1))} y2={gy} stroke={gridColor} strokeWidth={2 * s} />
+        ))}
+        <line x1={left} y1={base} x2={left + (right - left) * grid(0)} y2={base} stroke={stroke} strokeWidth={2 * s} />
+        {landed > 0.05 && <line x1={tip[0]} y1={tip[1] + 22 * s} x2={tip[0]} y2={tip[1] + 22 * s + (base - tip[1] - 22 * s) * drop} stroke={stroke} strokeWidth={2 * s} strokeDasharray={`${3 * s} ${9 * s}`} />}
+        {p > 0 && <polyline points={visible.map((q) => `${q[0].toFixed(1)},${q[1].toFixed(1)}`).join(' ')} fill="none" stroke={stroke} strokeWidth={6 * s} strokeLinecap="round" strokeLinejoin="round" />}
+        {landed > 0 && halo < 1 && <circle cx={tip[0]} cy={tip[1]} r={(13 + 47 * halo) * s} fill={stroke} opacity={0.18 * (1 - halo)} />}
+        {f(T0) > 0 && <circle cx={tip[0]} cy={tip[1]} r={13 * s} fill={tipColor} stroke="#000" strokeWidth={5 * s} />}
+      </svg>
+      {chart.label && <GraphLabel text={chart.label} s={s} />}
+    </div>
+  );
+};
+
+const GraphLabel: React.FC<{ text: string; s: number }> = ({ text, s }) => (
+  <div style={{ position: 'absolute', left: 10 * s, top: -34 * s, fontFamily: FONT_FAMILY, fontWeight: 600, fontSize: 34 * s, color: '#8a8a8a', whiteSpace: 'nowrap' }}>{text}</div>
+);

@@ -33,7 +33,7 @@ export const LINES: Record<'fr' | 'en', Record<MotivationTheme, LineBank>> = {
       grind: [
         "desk|Pendant qu'ils regardent des séries, toi, tu *apprends*.",
         "alarm|Cinq heures du matin. Pas d'excuse. Juste le *travail*.",
-        'stairs|Une marche par jour. Personne ne voit la montée. Tout le monde verra le *sommet*.',
+        'steps|Une marche par jour. Personne ne voit la montée. Tout le monde verra le *sommet*.',
         "road|Seul sur la route, sans applaudissements. C'est là que tout se *joue*.",
         "gym|La discipline d'aujourd'hui, c'est la *liberté* de demain.",
       ],
@@ -63,7 +63,7 @@ export const LINES: Record<'fr' | 'en', Record<MotivationTheme, LineBank>> = {
       ],
       truth: [
         "gym|La discipline, c'est faire ce que tu détestes, comme si tu l'*aimais*.",
-        'stairs|Les petites actions répétées battent les grands plans *oubliés*.',
+        'steps|Les petites actions répétées battent les grands plans *oubliés*.',
         'mountain|Le confort est une prison avec une très belle *vue*.',
         "chess|Maîtrise-toi, et personne ne pourra jamais te *contrôler*.",
         'spotlight:hourglass|Tu ne manques pas de temps. Tu manques de *priorités*.',
@@ -147,7 +147,7 @@ export const LINES: Record<'fr' | 'en', Record<MotivationTheme, LineBank>> = {
         'desk|Lis. Apprends. Grandis. En *silence*.',
         'gym|Ton corps abandonne quand ton esprit abandonne. Alors *tiens bon*.',
         'alarm|Dis-toi chaque matin : aujourd’hui, je suis plus fort que mes *excuses*.',
-        'stairs|Petit à petit, la confiance se *gagne*.',
+        'steps|Petit à petit, la confiance se *gagne*.',
       ],
       vision: [
         "sunrise|Un jour, tu ne reconnaîtras plus la personne que tu étais. Et c'est *parfait*.",
@@ -184,7 +184,7 @@ export const LINES: Record<'fr' | 'en', Record<MotivationTheme, LineBank>> = {
       grind: [
         'desk|While they binge another series, you *learn*.',
         'alarm|Five a.m. No excuses. Just the *work*.',
-        'stairs|One step a day. Nobody sees the climb. Everyone will see the *top*.',
+        'steps|One step a day. Nobody sees the climb. Everyone will see the *top*.',
         "road|Alone on the road, no applause. That's where it's *decided*.",
         "gym|Today's discipline is tomorrow's *freedom*.",
       ],
@@ -214,7 +214,7 @@ export const LINES: Record<'fr' | 'en', Record<MotivationTheme, LineBank>> = {
       ],
       truth: [
         'gym|Discipline is doing what you hate like you *love* it.',
-        'stairs|Small actions, repeated, beat big plans that get *forgotten*.',
+        'steps|Small actions, repeated, beat big plans that get *forgotten*.',
         'mountain|Comfort is a prison with a beautiful *view*.',
         'chess|Master yourself, and no one will ever *control* you.',
         "spotlight:hourglass|You don't lack time. You lack *priorities*.",
@@ -298,7 +298,7 @@ export const LINES: Record<'fr' | 'en', Record<MotivationTheme, LineBank>> = {
         'desk|Read. Learn. Grow. In *silence*.',
         'gym|Your body quits when your mind quits. So *hold on*.',
         "alarm|Tell yourself every morning: today I'm stronger than my *excuses*.",
-        'stairs|Little by little, confidence is *earned*.',
+        'steps|Little by little, confidence is *earned*.',
       ],
       vision: [
         "sunrise|One day you won't recognise who you used to be. And that's *perfect*.",

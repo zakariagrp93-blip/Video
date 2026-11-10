@@ -648,7 +648,82 @@ const Desk: React.FC<MotifProps> = ({ scene, frame, fps }) => {
   );
 };
 
+/**
+ * Minimal steps — style adapted from "claude-animation-skills" /minimalistic-graphics
+ * (MIT, Artem Novitckii): pure black, hairline outlined steps rising one by one, one
+ * white dot hopping up them with squash and stretch, then an orbit, a ring and sparks.
+ */
+const Steps: React.FC<MotifProps> = ({ scene, frame, fps }) => {
+  const N = 5;
+  const LX = 150;
+  const RX = 930;
+  const BW = Math.min(116, ((RX - LX) / N) * 0.77);
+  const pitch = (RX - LX - BW) / (N - 1);
+  const BX = Array.from({ length: N }, (_, k) => LX + BW / 2 + k * pitch);
+  const TOP = Array.from({ length: N }, (_, k) => 1560 - k * (560 / (N - 1)));
+  const R = 31;
+  const t = frame / fps;
+  const span = Math.max(1.6, (scene.durationInFrames / fps) * 0.62);
+  const STEP = Math.min(0.5, Math.max(0.24, (span - 0.6) / (N - 1)));
+  const ease = (a: number, b: number, x: number) => Math.min(1, Math.max(0, (x - a) / (b - a)));
+  const out3 = (x: number) => 1 - (1 - x) ** 3;
+  // Which step is the dot on, and where in its hop?
+  let bx = BX[0]!;
+  let by = TOP[0]! - R;
+  let sx = 1;
+  let sy = 1;
+  const arrive = ease(0, 0.16, t);
+  let scale = t < 0.16 ? 2.1 * out3(arrive) : t < 0.42 ? 2.1 - 1.1 * ease(0.16, 0.42, t) : 1;
+  for (let k = 1; k < N; k++) {
+    const th = 0.42 + STEP * (k - 1) + 0.2;
+    if (t < th - 0.05) break;
+    const h = ease(th, th + 0.3, t);
+    const y0 = TOP[k - 1]! - R;
+    const y1 = TOP[k]! - R;
+    const peak = Math.min(y0, y1) - 120;
+    bx = BX[k - 1]! + (BX[k]! - BX[k - 1]!) * h;
+    by = h < 0.5 ? y0 + (peak - y0) * (1 - (1 - h * 2) ** 2) : peak + (y1 - peak) * ((h - 0.5) * 2) ** 2;
+    if (t < th) [sx, sy] = [1.18, 0.78];
+    else if (h < 1) [sx, sy] = h < 0.33 ? [0.9, 1.12] : [1, 1];
+    else if (t < th + 0.35) [sx, sy] = [1.22, 0.74];
+  }
+  const TP = 0.42 + STEP * (N - 2) + 0.58;
+  const pay = t - TP;
+  const OX = BX[N - 1]!;
+  const OY = TOP[N - 1]! - R;
+  const orbit = ease(0.05, 0.6, pay);
+  const ring = ease(0.18, 0.78, pay);
+  const burst = out3(ease(0.05, 0.55, pay));
+  if (pay >= 0) scale = 1;
+  return (
+    <Svg>
+      <rect width={W} height={H} fill="#000" />
+      <g fill="none" stroke="#f4f4f4" strokeWidth={2.6} opacity={pay > 0.1 ? 1 - 0.68 * ease(0.1, 0.6, pay) : 1}>
+        {BX.map((x, k) => {
+          const rise = out3(ease(k === 0 ? 0.18 : 0.42 + STEP * (k - 1), (k === 0 ? 0.18 : 0.42 + STEP * (k - 1)) + 0.32, t));
+          const top = H + 40 - (H + 40 - TOP[k]!) * rise;
+          return <rect key={k} x={x - BW / 2} y={top} width={BW} height={H} />;
+        })}
+      </g>
+      {pay > 0 && (
+        <>
+          <circle cx={OX} cy={OY} r={112} fill="none" stroke="#f4f4f4" strokeWidth={2} strokeDasharray="5 9" opacity={orbit} transform={`rotate(${-90 + 40 * Math.min(1, pay / 1.6)} ${OX} ${OY})`} />
+          <ellipse cx={OX} cy={OY} rx={180} ry={38} fill="none" stroke="#bdbdbd" strokeWidth={2} strokeDasharray={`${1000 * ring} 1000`} />
+          {Array.from({ length: 22 }, (_, i) => {
+            const a = (i / 22) * Math.PI * 2 + (i % 2) * 0.12;
+            const d = (150 + (i % 4) * 28) * burst;
+            return <circle key={i} cx={OX + Math.cos(a) * d} cy={OY + Math.sin(a) * d} r={i % 3 ? 4 : 6} fill="#f4f4f4" opacity={burst * (pay > 0.55 ? (i % 3 ? 0.35 : 0.8) : 1)} />;
+          })}
+          <circle cx={OX} cy={OY} r={34 * (1 + 3.2 * ease(0, 0.6, pay))} fill="none" stroke="#f4f4f4" strokeWidth={3} opacity={0.9 * (1 - ease(0, 0.6, pay))} />
+        </>
+      )}
+      <circle cx={bx} cy={by} r={R} fill="#f4f4f4" transform={`translate(${bx} ${by + R}) scale(${sx * scale} ${sy * scale}) translate(${-bx} ${-(by + R)})`} />
+    </Svg>
+  );
+};
+
 export const MOTIF_VIEWS: Record<Motif, React.FC<MotifProps>> = {
+  steps: Steps,
   skyline: Skyline,
   road: Road,
   mountain: Mountain,

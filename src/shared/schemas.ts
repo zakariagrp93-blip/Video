@@ -274,6 +274,8 @@ export const VideoPlanSchema = z.object({
   banner: z.string().max(140).optional(),
   /** Colour treatment applied to object illustrations. */
   iconTone: z.enum(['color', 'muted', 'mono']).default('color'),
+  /** 'minimal' = self-drawing hairline graph; 'classic' = boxed, coloured chart. */
+  chartStyle: z.enum(['minimal', 'classic']).optional(),
   scenes: z.array(PlannedSceneSchema).min(1),
   captions: z.array(CaptionCueSchema),
   /** imageKey -> URL reachable by the renderer (local asset server). */
@@ -352,6 +354,8 @@ export const SettingsSchema = z.object({
   customIconsDir: z.string().default(''),
   /** Colour treatment of object illustrations: full colour, muted (closer to cinematic finance stories) or monochrome. */
   iconTone: z.enum(['color', 'muted', 'mono']).default('mono'),
+  /** Charts: minimal self-drawing line (default) or the classic boxed, coloured chart. */
+  chartStyle: z.enum(['minimal', 'classic']).default('minimal'),
   /** Max AI illustrations per video (cost guard). Vector assets are unlimited. */
   maxAiImagesPerVideo: z.number().int().min(0).max(8).default(2),
   ttsProvider: z.enum(TTS_PROVIDERS).default('piper'),

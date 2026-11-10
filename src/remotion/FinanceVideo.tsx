@@ -63,7 +63,7 @@ const SceneFrame: React.FC<{ plan: VideoPlan; index: number; speaking: (f: numbe
   const frame = useCurrentFrame();
   const scene = plan.scenes[index]!;
   const next = plan.scenes[index + 1];
-  return <SceneView scene={scene} nextTransition={next ? next.transition : null} frame={frame} fps={fps} theme={plan.theme} lang={plan.language} images={plan.images} talking={speaking} layout={layout} iconTone={plan.iconTone} />;
+  return <SceneView scene={scene} nextTransition={next ? next.transition : null} frame={frame} fps={fps} theme={plan.theme} lang={plan.language} images={plan.images} talking={speaking} layout={layout} iconTone={plan.iconTone} chartStyle={plan.chartStyle} />;
 };
 
 /** Persistent hook question in a red rounded banner (top of the frame, TikTok-safe). */

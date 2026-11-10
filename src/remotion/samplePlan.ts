@@ -19,7 +19,7 @@ const EXPR: Record<string, Expression> = {
 };
 
 /** Demo plan showing every pose with props — used as Remotion Studio default props and in render tests. */
-export function samplePlan(scenesCount: number = POSES.length, sceneSeconds = 2, layout: 'tall' | 'cinema' = 'tall'): VideoPlan {
+export function samplePlan(scenesCount: number = POSES.length, sceneSeconds = 2, layout: 'tall' | 'cinema' = 'tall', chartStyle: 'minimal' | 'classic' = 'classic'): VideoPlan {
   const dur = Math.round(sceneSeconds * VIDEO_FPS);
   const scenes: PlannedScene[] = POSES.slice(0, scenesCount).map((pose, i) => ({
     id: `s${String(i + 1).padStart(2, '0')}`,
@@ -54,6 +54,7 @@ export function samplePlan(scenesCount: number = POSES.length, sceneSeconds = 2,
     layout,
     captionMode: layout === 'cinema' ? 'sentence' : 'karaoke',
     iconTone: 'color',
+    chartStyle,
     banner: layout === 'cinema' ? 'Et si tu recevais 1 million d’euros à 18 ans ?' : undefined,
     scenes,
     captions: scenes.map((s) => ({ startFrame: s.startFrame + 5, endFrame: s.startFrame + s.durationInFrames - 5, words: [{ text: s.character.pose, startFrame: s.startFrame + 5, endFrame: s.startFrame + 30, tone: 'accent' as const }] })),
@@ -65,7 +66,7 @@ export function samplePlan(scenesCount: number = POSES.length, sceneSeconds = 2,
 export function sampleEditPlan(sceneSeconds = 2.4): VideoPlan {
   const dur = Math.round(sceneSeconds * VIDEO_FPS);
   const heroes = ['sports-car', 'money-stack', 'trophy', 'hourglass'] as const;
-  const lines = ['PERSONNE NE VIENDRA', 'TE RENDRE RICHE', 'CINQ HEURES DU MATIN', 'PAS D’EXCUSE', 'UNE MARCHE PAR JOUR', 'TU VAS DOUTER', 'JOUE POUR GAGNER', 'LÈVE-TOI', 'LE PRIX DU SUCCÈS', 'DEMAIN COMMENCE', 'TOUS PAREILS', 'APPRENDS EN SILENCE'];
+  const lines = ['PERSONNE NE VIENDRA', 'TE RENDRE RICHE', 'CINQ HEURES DU MATIN', 'PAS D’EXCUSE', 'UNE MARCHE PAR JOUR', 'TU VAS DOUTER', 'JOUE POUR GAGNER', 'LÈVE-TOI', 'LE PRIX DU SUCCÈS', 'DEMAIN COMMENCE', 'TOUS PAREILS', 'APPRENDS EN SILENCE', 'PETIT À PETIT'];
   const silhouettes = new Set(['skyline', 'road', 'mountain', 'stairs', 'rain', 'sunrise', 'crowd', 'desk']);
   const scenes: PlannedScene[] = MOTIFS.map((motif, i) => ({
     id: `s${String(i + 1).padStart(2, '0')}`,

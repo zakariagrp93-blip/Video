@@ -17,8 +17,8 @@ export const RemotionRoot: React.FC = () => (
     width={VIDEO_WIDTH}
     height={VIDEO_HEIGHT}
     fps={VIDEO_FPS}
-    durationInFrames={samplePlan(14, 2, 'cinema').durationInFrames}
-    defaultProps={{ plan: samplePlan(14, 2, 'cinema') } satisfies FinanceVideoProps}
+    durationInFrames={samplePlan(14, 2, 'cinema', 'minimal').durationInFrames}
+    defaultProps={{ plan: samplePlan(14, 2, 'cinema', 'minimal') } satisfies FinanceVideoProps}
   />
   <Composition
     id="EditPreview"

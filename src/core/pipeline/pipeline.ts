@@ -370,6 +370,7 @@ export class GenerationPipeline {
       captionMode: edit ? 'kinetic' : cinematic ? 'sentence' : 'karaoke',
       banner: cinematic ? script.title : undefined,
       iconTone: settings.iconTone,
+      chartStyle: settings.chartStyle,
       mode: edit ? 'edit' : 'story',
       beat: grid ?? undefined,
       snap,

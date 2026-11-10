@@ -148,3 +148,15 @@ describe('audio generation', () => {
     expect(during).toBeLessThan(before * 0.6); // ducked (DC music component lowered)
   });
 });
+
+describe('minimal graph geometry', () => {
+  it('passes through the first and last points and grows monotonically in length', async () => {
+    const { smoothPath } = await import('../../src/remotion/Chart');
+    const pts: Array<[number, number]> = [[0, 100], [50, 80], [100, 20]];
+    const p = smoothPath(pts);
+    expect(p.pts[0]).toEqual([0, 100]);
+    expect(p.pts[p.pts.length - 1]![0]).toBeCloseTo(100);
+    expect(p.pts[p.pts.length - 1]![1]).toBeCloseTo(20);
+    for (let i = 1; i < p.cum.length; i++) expect(p.cum[i]!).toBeGreaterThanOrEqual(p.cum[i - 1]!);
+  });
+});

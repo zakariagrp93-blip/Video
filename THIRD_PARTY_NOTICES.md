@@ -19,6 +19,19 @@ The icon picker (`scripts/build-icon-picker.mjs`) also offers Microsoft Fluent E
 Copyright (c) Microsoft Corporation); picking one of those sets for an asset embeds it under that
 license.
 
+## claude-animation-skills (animation styles)
+
+The minimal self-drawing graph (`MinimalGraphView` in `src/remotion/Chart.tsx`) and the minimal
+"steps" shot of motivation edits (`src/remotion/edit/motifs.tsx`) re-implement, in Remotion, the
+look and timing of the `/graph` and `/minimalistic-graphics` skills from
+https://github.com/artemnovitckii/claude-animation-skills.
+
+MIT License — Copyright (c) 2026 Artem Novitckii. Permission is hereby granted, free of charge, to
+any person obtaining a copy of this software and associated documentation files, to deal in the
+Software without restriction, subject to including the copyright notice and this permission notice
+in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT
+WARRANTY OF ANY KIND.
+
 ## Other components
 
 - Montserrat font — SIL Open Font License 1.1 (via `@fontsource/montserrat`).
