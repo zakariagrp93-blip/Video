@@ -15,7 +15,7 @@ export interface TextRequest {
   prompt: string;
   images?: Array<{ data: Buffer; mediaType: 'image/png' | 'image/jpeg' }>;
   /** Live progress while the answer streams: 'thinking', then the characters written so far. */
-  onProgress?: (p: { phase: 'connecting' | 'thinking' | 'writing'; chars: number }) => void;
+  onProgress?: (p: { phase: 'connecting' | 'thinking' | 'writing'; chars: number; quietSec?: number }) => void;
 }
 
 export interface JsonRequest<S extends z.ZodType> {

@@ -199,11 +199,10 @@ export async function writeStickShots(script: Script, timing: StickTiming, deps:
     const s = Math.round((Date.now() - t0) / 1000);
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   };
-  const onProgress: TextRequest['onProgress'] = (p) =>
-    deps.report(
-      at,
-      p.phase === 'writing' ? `${label}… ${p.chars.toLocaleString('fr-FR')} characters written (${clock()})` : p.phase === 'thinking' ? `${label}… thinking (${clock()})` : `${label}… connecting`,
-    );
+  const onProgress: TextRequest['onProgress'] = (p) => {
+    const quiet = p.quietSec && p.quietSec > 45 ? ` · no data for ${p.quietSec} s` : p.phase === 'connecting' ? '' : ' · connection OK';
+    deps.report(at, p.phase === 'writing' ? `${label}… ${p.chars.toLocaleString('fr-FR')} characters written (${clock()})${quiet}` : p.phase === 'thinking' ? `${label}… thinking (${clock()})${quiet}` : `${label}… connecting`);
+  };
   const phase = (l: string, a: number) => {
     label = l;
     at = a;

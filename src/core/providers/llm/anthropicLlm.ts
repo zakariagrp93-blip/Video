@@ -98,14 +98,16 @@ export class AnthropicLLMProvider extends RemoteLLMProvider {
         );
       let chars = 0;
       let last = 0;
+      let phase: 'thinking' | 'writing' | null = null;
       let lastLog = Date.now();
       const started = Date.now();
       ctx.log.info(`Claude ${req.name}: request sent (${Math.round((req.system.length + req.prompt.length) / 1000)}k chars of prompt${req.images?.length ? `, ${req.images.length} image(s)` : ''})`);
-      const tick = (phase: 'thinking' | 'writing') => {
+      const tick = (p: 'thinking' | 'writing', force = false) => {
+        phase = p;
         const now = Date.now();
-        if (now - last > 800) {
+        if (force || now - last > 800) {
           last = now;
-          req.onProgress?.({ phase, chars });
+          req.onProgress?.({ phase: p, chars, quietSec: Math.round((now - lastEvent) / 1000) });
         }
         if (now - lastLog > 60_000) {
           lastLog = now;
@@ -113,6 +115,7 @@ export class AnthropicLLMProvider extends RemoteLLMProvider {
         }
       };
       stream.on('streamEvent', (ev) => {
+        if (!phase) tick('thinking', true); // the request reached Claude
         if (ev.type === 'content_block_start' && ev.content_block.type === 'thinking') tick('thinking');
         if (ev.type === 'content_block_delta' && ev.delta.type !== 'text_delta') tick('thinking');
       });
@@ -128,8 +131,11 @@ export class AnthropicLLMProvider extends RemoteLLMProvider {
         if (Date.now() - lastEvent > STREAM_STALL_MS) {
           stalled = true;
           stream.abort();
+          return;
         }
-      }, 5000);
+        // Keep the clock moving on screen (and in the log) even while Claude thinks silently.
+        if (phase) tick(phase, true);
+      }, 2000);
       let response: Awaited<ReturnType<typeof stream.finalMessage>>;
       try {
         response = await stream.finalMessage();
