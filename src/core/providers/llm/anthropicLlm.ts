@@ -10,6 +10,9 @@ import { RemoteLLMProvider, type JsonRequest, type TextRequest } from './remoteL
  * Claude via the official Anthropic SDK, using structured outputs so every
  * response is schema-valid JSON. Server-side refusal fallbacks are enabled.
  */
+/** Abort a streamed answer when nothing at all has arrived for this long. */
+export const STREAM_STALL_MS = Number(process.env.FVS_STREAM_STALL_MS) || 6 * 60 * 1000;
+
 export class AnthropicLLMProvider extends RemoteLLMProvider {
   readonly id = 'anthropic';
   readonly label = 'Anthropic Claude';
@@ -21,10 +24,33 @@ export class AnthropicLLMProvider extends RemoteLLMProvider {
     super(getModel);
   }
 
-  private client(): Anthropic {
+  /** onBytes: called for every chunk of the raw response body (including the API's keep-alive pings). */
+  private client(onBytes?: () => void): Anthropic {
     const key = this.apiKey();
     if (!key) throw new ProviderError('anthropic', 'API key not configured');
-    return new Anthropic({ apiKey: key, fetch: getFetchImplementation() as never, maxRetries: 2, timeout: 10 * 60 * 1000 });
+    const base = getFetchImplementation();
+    const fetchImpl = onBytes
+      ? async (input: Parameters<typeof base>[0], init?: Parameters<typeof base>[1]) => {
+          const res = await base(input, init);
+          if (!res.body) return res;
+          const reader = res.body.getReader();
+          const body = new ReadableStream<Uint8Array>({
+            async pull(controller) {
+              const { done, value } = await reader.read();
+              if (done) controller.close();
+              else {
+                onBytes();
+                controller.enqueue(value);
+              }
+            },
+            cancel(reason) {
+              return reader.cancel(reason);
+            },
+          });
+          return new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers });
+        }
+      : base;
+    return new Anthropic({ apiKey: key, fetch: fetchImpl as never, maxRetries: 2, timeout: 10 * 60 * 1000 });
   }
 
   checkReady(): string | null {
@@ -52,7 +78,10 @@ export class AnthropicLLMProvider extends RemoteLLMProvider {
         { type: 'text' as const, text: req.prompt },
       ];
       req.onProgress?.({ phase: 'connecting', chars: 0 });
-      const stream = this.client().beta.messages.stream(
+      let lastEvent = Date.now();
+      const stream = this.client(() => {
+        lastEvent = Date.now();
+      }).beta.messages.stream(
           {
             model: this.model,
             max_tokens: 64000,
@@ -83,7 +112,25 @@ export class AnthropicLLMProvider extends RemoteLLMProvider {
         chars += delta.length;
         tick('writing');
       });
-      const response = await stream.finalMessage();
+      // Watchdog: a reply that stops arriving (stalled connection, antivirus or proxy holding the
+      // stream) would otherwise wait forever. Any bytes from the API — keep-alive pings included —
+      // reset the clock, so a long silent "thinking" phase is not mistaken for a stall.
+      let stalled = false;
+      const watchdog = setInterval(() => {
+        if (Date.now() - lastEvent > STREAM_STALL_MS) {
+          stalled = true;
+          stream.abort();
+        }
+      }, 5000);
+      let response: Awaited<ReturnType<typeof stream.finalMessage>>;
+      try {
+        response = await stream.finalMessage();
+      } catch (err) {
+        if (stalled) throw new ProviderError('anthropic', `No data from Claude for ${STREAM_STALL_MS >= 60000 ? `${Math.round(STREAM_STALL_MS / 60000)} minutes` : `${Math.round(STREAM_STALL_MS / 1000)} s`} (connection stalled). Retrying.`, undefined, true);
+        throw err;
+      } finally {
+        clearInterval(watchdog);
+      }
       ctx.usage({
         provider: 'anthropic',
         kind: 'llm',
