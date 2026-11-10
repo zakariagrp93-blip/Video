@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { AnthropicLLMProvider } from '../../src/core/providers/llm/anthropicLlm';
 import { OpenAILLMProvider } from '../../src/core/providers/llm/openaiLlm';
-import { ElevenLabsTTSProvider, wordsFromCharAlignment } from '../../src/core/providers/tts/elevenlabsTts';
+import { ElevenLabsTTSProvider, supportsLanguageCode, wordsFromCharAlignment } from '../../src/core/providers/tts/elevenlabsTts';
 import { OpenAITTSProvider } from '../../src/core/providers/tts/openaiTts';
 import { OfflineLLMProvider } from '../../src/core/providers/llm/offline/offlineLlm';
 import { buildScriptRequest } from '../../src/core/script/scriptEngine';
@@ -181,6 +181,21 @@ describe('ElevenLabs provider', () => {
     expect(r.alignment).toBe('provider-chars');
     expect(r.words?.map((w) => w.text)).toEqual(['Salut', 'toi']);
     expect(r.samples.length).toBe(24000);
+    // multilingual v2 rejects language_code — it must not be sent.
+    expect(JSON.parse(String(captured[0]!.init.body))).not.toHaveProperty('language_code');
+  });
+
+  it('sends language_code only to Turbo/Flash v2.5 models', () => {
+    expect(supportsLanguageCode('eleven_flash_v2_5')).toBe(true);
+    expect(supportsLanguageCode('eleven_turbo_v2_5')).toBe(true);
+    expect(supportsLanguageCode('eleven_multilingual_v2')).toBe(false);
+  });
+
+  it('explains paid-plan-only voices and does not retry', async () => {
+    mockFetch(() => ({ status: 402, json: { detail: { code: 'paid_plan_required' } } }));
+    const { ctx } = await testContext();
+    const p = new ElevenLabsTTSProvider(() => 'xi-test-key-1234567890', () => 'eleven_multilingual_v2', () => ({ male: 'm', female: 'f' }));
+    await expect(p.synthesize({ text: 'x', language: 'fr', voiceId: 'f', speed: 1 }, ctx)).rejects.toMatchObject({ retryable: false, status: 402, message: expect.stringContaining('premade') });
   });
 
   it('marks rate limits as retryable', async () => {

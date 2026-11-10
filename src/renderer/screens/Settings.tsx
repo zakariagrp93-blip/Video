@@ -465,17 +465,53 @@ function VoicesCard({ s, save }: { s: Settings; save: (p: Partial<Settings>) => 
         </>
       )}
       {s.ttsProvider === 'elevenlabs' && (
-        <div className="form-grid">
-          <Field label="Male voice ID">
-            <TextInput value={s.voices.elevenlabs.male} onCommit={(v) => save({ voices: { ...s.voices, elevenlabs: { ...s.voices.elevenlabs, male: v } } })} />
-          </Field>
-          <Field label="Female voice ID">
-            <TextInput value={s.voices.elevenlabs.female} onCommit={(v) => save({ voices: { ...s.voices, elevenlabs: { ...s.voices.elevenlabs, female: v } } })} />
-          </Field>
-          <Field label="Model">
-            <TextInput value={s.elevenlabsModel} onCommit={(v) => save({ elevenlabsModel: v })} />
-          </Field>
-        </div>
+        <>
+          <div className="row gap-8 mb-12">
+            <Button
+              size="sm"
+              onClick={() =>
+                void api()
+                  .listVoices('elevenlabs', lang)
+                  .then((v) => {
+                    setVoices(v);
+                    toast(v.length ? 'success' : 'error', v.length ? `${v.length} voices loaded.` : 'No voices returned — check your API key.');
+                  })
+                  .catch((err) => toast('error', errorText(err)))
+              }
+            >
+              Load my voices
+            </Button>
+            <span className="small muted">Free plans can only use voices marked “free” (premade) or voices you created.</span>
+          </div>
+          <div className="form-grid">
+            {(['male', 'female'] as const).map((g) => {
+              const current = s.voices.elevenlabs[g];
+              const set = (v: string) => save({ voices: { ...s.voices, elevenlabs: { ...s.voices.elevenlabs, [g]: v } } });
+              return (
+                <Field key={g} label={`${g === 'male' ? 'Male' : 'Female'} voice`}>
+                  {voices.length > 0 ? (
+                    <Select
+                      value={current}
+                      onChange={set}
+                      options={[
+                        { value: '', label: '— none —' },
+                        ...(current && !voices.some((v) => v.id === current) ? [{ value: current, label: `${current} (not in your account)` }] : []),
+                        ...[...voices]
+                          .sort((a, b) => Number(b.category === 'premade') - Number(a.category === 'premade') || a.label.localeCompare(b.label))
+                          .map((v) => ({ value: v.id, label: `${v.label}${v.gender !== 'unspecified' ? ` · ${v.gender}` : ''}${v.category === 'premade' ? ' · free' : v.category === 'cloned' || v.category === 'generated' ? ' · yours' : v.category ? ` · ${v.category}` : ''}` })),
+                      ]}
+                    />
+                  ) : (
+                    <TextInput value={current} onCommit={set} />
+                  )}
+                </Field>
+              );
+            })}
+            <Field label="Model">
+              <TextInput value={s.elevenlabsModel} onCommit={(v) => save({ elevenlabsModel: v })} />
+            </Field>
+          </div>
+        </>
       )}
       {s.ttsProvider === 'openai' && (
         <div className="form-grid">

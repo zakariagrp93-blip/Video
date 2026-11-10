@@ -38,6 +38,11 @@ export function wordsFromCharAlignment(al: Alignment): WordTiming[] {
   return words;
 }
 
+/** Models that accept the `language_code` request field. */
+export function supportsLanguageCode(model: string): boolean {
+  return /(turbo|flash)_v2_5/.test(model);
+}
+
 /** ElevenLabs TTS — uses the /with-timestamps endpoint for character-accurate subtitle timing. */
 export class ElevenLabsTTSProvider implements TTSProvider {
   readonly id = 'elevenlabs';
@@ -75,12 +80,13 @@ export class ElevenLabsTTSProvider implements TTSProvider {
     if (!this.apiKey()) return [];
     const res = await httpFetch(`${API}/voices`, { headers: this.headers() });
     if (!res.ok) throw new ProviderError('elevenlabs', `Listing voices failed (HTTP ${res.status})`, res.status);
-    const json = (await res.json()) as { voices: Array<{ voice_id: string; name: string; labels?: Record<string, string> }> };
+    const json = (await res.json()) as { voices: Array<{ voice_id: string; name: string; category?: string; labels?: Record<string, string> }> };
     return json.voices.map((v) => ({
       id: v.voice_id,
       label: v.name,
       language: language ?? 'en',
       gender: v.labels?.gender === 'male' ? 'male' : v.labels?.gender === 'female' ? 'female' : 'unspecified',
+      category: v.category,
     }));
   }
 
@@ -108,13 +114,22 @@ export class ElevenLabsTTSProvider implements TTSProvider {
       body: JSON.stringify({
         text: req.text,
         model_id: model,
-        language_code: req.language,
+        // Only the Turbo/Flash v2.5 models accept an explicit language code.
+        ...(supportsLanguageCode(model) ? { language_code: req.language } : {}),
         voice_settings: { stability: 0.5, similarity_boost: 0.75, speed: Math.min(1.2, Math.max(0.7, req.speed)) },
       }),
     });
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       ctx.usage({ provider: 'elevenlabs', kind: 'tts', model, units: 0, unitType: 'characters', ok: false });
+      if (res.status === 402 || /paid_plan_required|payment_required/.test(body)) {
+        throw new ProviderError(
+          'elevenlabs',
+          'This voice needs a paid ElevenLabs plan (free accounts can only use the default "premade" voices or voices you created). Settings → Voices → "Load my voices" and pick one marked free.',
+          res.status,
+          false,
+        );
+      }
       throw new ProviderError('elevenlabs', `TTS failed (HTTP ${res.status}) ${body.slice(0, 200)}`, res.status, res.status === 429 || res.status >= 500);
     }
     const json = (await res.json()) as { audio_base64: string; alignment?: Alignment; normalized_alignment?: Alignment };

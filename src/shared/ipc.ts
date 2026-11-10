@@ -71,6 +71,8 @@ export interface VoiceDTO {
   language: Language;
   gender: 'male' | 'female' | 'unspecified';
   installed?: boolean;
+  /** ElevenLabs voice category ("premade" voices work on free plans). */
+  category?: string;
   sizeMb?: number;
 }
 
