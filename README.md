@@ -78,7 +78,7 @@ npm run studio
 ### Visual system
 
 - **Nummo**, an original mascot: a white egg-shaped character with simple black eyes and a small green sprout (money that grows). It is drawn in SVG from joint angles, so it looks exactly the same in every scene. It has **14 poses** (idle, walking, running, sitting, thinking, surprised, happy, sad, shocked, pointing, holding money, holding phone, explaining, celebrating) and **10 expressions**, with blinking, breathing, a walk cycle and a mouth that animates while the narrator speaks.
-- **36 vector illustrations**: banknotes, coins, banks, houses, cars, phones, cards, laptops, charts, clocks, buildings, shops, piggy bank, calendar and more. All share one line style.
+- **36 vector illustrations** (hand-drawn plus Microsoft Fluent Emoji artwork, MIT): banknotes, coins, banks, houses, cars, phones, cards, laptops, charts, clocks, buildings, shops, piggy bank, calendar and more. All share one line style.
 - **Animation library** (`src/remotion/anim.ts`) with one set of easing curves: pop, fade, float, fall, slide, rise, grow, shake, spin, pulse; camera zoom, pan, push-in, tilt and shake; character enter, exit, walk-across, jump, bounce, shiver and lean-in; scene transitions; money rain, coin burst, sparkles, impact, confetti, smoke and speed lines; animated line and bar charts; number counters.
 - **Captions**: karaoke-style, 1–3 words per cue, white with automatic yellow emphasis (numbers, key words) and red for losses and risks. They sit in the TikTok-safe band, below the mascot's feet and clear of the platform UI and right-side buttons.
 
@@ -202,7 +202,7 @@ Output: `release/Finance-Video-Studio-Setup-<version>.exe`, a per-user NSIS inst
 
 ## Licensing notes
 
-- **Mascot, illustrations, music and sound effects are original.** The mascot and props are hand-built SVG components. Music and SFX are synthesized procedurally from oscillators and noise at render time, so no samples or third-party recordings are used.
+- **The mascot, music and sound effects are original.** The mascot is a hand-built SVG component. Object illustrations are a mix of hand-drawn SVGs and **Microsoft Fluent Emoji** artwork (MIT license, see `THIRD_PARTY_NOTICES.md`). Music and SFX are synthesized procedurally from oscillators and noise at render time, so no samples or third-party recordings are used.
 - The visual direction is *inspired by* minimalist finance storytelling videos. No Finance Lite characters, logos, illustrations or scripts are used or copied.
 - **Remotion** has its own license: free for individuals and companies of up to 3 people, and a company license is required above that. See <https://remotion.dev/license>.
 - **Piper** voices are downloaded from the official `rhasspy/piper` release. Each voice folder contains its `MODEL_CARD` with dataset and license details. eSpeak-NG is GPL-3.0, and Montserrat is under the SIL Open Font License.

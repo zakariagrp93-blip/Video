@@ -1,24 +1,24 @@
-import React from 'react';
+import React, { useId } from 'react';
 import type { Expression, Pose } from '../shared/constants';
 
 /**
- * "Nummo" — the original Finance Video Studio mascot. A white egg-shaped
- * character with simple black eyes and a small green sprout ("money that
- * grows"). Drawn entirely in SVG from joint angles, so every pose keeps the
- * exact same proportions — the character is identical in every scene.
+ * "Nummo" — the original Finance Video Studio mascot (v2, "clean" design).
+ * A soft white egg-shaped character with glossy black eyes and a small green
+ * sprout ("money that grows"). Short rounded limbs, mitten hands and rounded
+ * shoes; soft radial shading and a highlight give volume without clutter.
+ * Drawn entirely in SVG from joint angles, so every pose keeps identical proportions.
  *
- * Coordinate system: viewBox 0 0 400 620, feet on y≈600.
+ * Coordinate system: viewBox 0 0 400 620, shoe soles on y≈600.
  */
 
 export const MASCOT_VIEWBOX = { width: 400, height: 620 };
 export const MASCOT_FEET_Y = 600;
 
-const WHITE = '#F7F7F9';
-const SHADE = '#E3E3EA';
-const INK = '#0B0B0D';
-const OUTLINE = 6;
+const LIMB = '#F1F1F5';
+const LIMB_SHADE = '#D9D9E2';
+const INK = '#111114';
+const GAP = 5;
 
-/** Angles in degrees from straight down; positive rotates away from the body (outward). */
 interface Limb {
   a1: number;
   a2: number;
@@ -31,36 +31,40 @@ interface PoseDef {
   tilt: number;
   bodyY: number;
   held?: 'phone' | 'banknote';
-  heldHand?: 'L' | 'R';
   lookX: number;
   lookY: number;
   sitting?: boolean;
   armsFront?: boolean;
 }
 
+/** Angles in degrees from straight down; positive rotates away from the body. */
 const POSES: Record<Pose, PoseDef> = {
-  idle: { armL: { a1: 12, a2: 6 }, armR: { a1: 12, a2: 6 }, legL: { a1: 4, a2: 0 }, legR: { a1: 4, a2: 0 }, tilt: 0, bodyY: 0, lookX: 0, lookY: 0 },
-  walking: { armL: { a1: 20, a2: 10 }, armR: { a1: 20, a2: 10 }, legL: { a1: 0, a2: 0 }, legR: { a1: 0, a2: 0 }, tilt: 2, bodyY: 0, lookX: 4, lookY: 0 },
-  running: { armL: { a1: 30, a2: 60 }, armR: { a1: 30, a2: 60 }, legL: { a1: 0, a2: 0 }, legR: { a1: 0, a2: 0 }, tilt: 8, bodyY: 0, lookX: 6, lookY: 0 },
-  sitting: { armL: { a1: 20, a2: 30 }, armR: { a1: 20, a2: 30 }, legL: { a1: -70, a2: 70 }, legR: { a1: -70, a2: 70 }, tilt: 0, bodyY: 70, lookX: 0, lookY: 0, sitting: true },
-  thinking: { armL: { a1: 10, a2: 4 }, armR: { a1: 35, a2: 125 }, legL: { a1: 4, a2: 0 }, legR: { a1: 4, a2: 0 }, tilt: -3, bodyY: 0, lookX: 8, lookY: -10, armsFront: true },
-  surprised: { armL: { a1: 55, a2: 35 }, armR: { a1: 55, a2: 35 }, legL: { a1: 8, a2: 0 }, legR: { a1: 8, a2: 0 }, tilt: 0, bodyY: -6, lookX: 0, lookY: -2 },
-  happy: { armL: { a1: 35, a2: 20 }, armR: { a1: 35, a2: 20 }, legL: { a1: 6, a2: 0 }, legR: { a1: 6, a2: 0 }, tilt: 0, bodyY: 0, lookX: 0, lookY: 0 },
-  sad: { armL: { a1: 4, a2: 0 }, armR: { a1: 4, a2: 0 }, legL: { a1: 2, a2: 0 }, legR: { a1: 2, a2: 0 }, tilt: 4, bodyY: 8, lookX: 0, lookY: 8 },
-  shocked: { armL: { a1: 150, a2: 15 }, armR: { a1: 150, a2: 15 }, legL: { a1: 12, a2: 0 }, legR: { a1: 12, a2: 0 }, tilt: 0, bodyY: -10, lookX: 0, lookY: -2 },
-  pointing: { armL: { a1: 12, a2: 6 }, armR: { a1: 92, a2: 0 }, legL: { a1: 5, a2: 0 }, legR: { a1: 5, a2: 0 }, tilt: 2, bodyY: 0, lookX: 10, lookY: 0 },
-  'holding-money': { armL: { a1: 12, a2: 6 }, armR: { a1: 50, a2: 55 }, legL: { a1: 4, a2: 0 }, legR: { a1: 4, a2: 0 }, tilt: 0, bodyY: 0, lookX: 8, lookY: 2, held: 'banknote', heldHand: 'R' },
-  'holding-phone': { armL: { a1: 18, a2: 95 }, armR: { a1: 18, a2: 95 }, legL: { a1: 4, a2: 0 }, legR: { a1: 4, a2: 0 }, tilt: 0, bodyY: 0, lookX: 0, lookY: 12, held: 'phone', heldHand: 'R', armsFront: true },
-  explaining: { armL: { a1: 30, a2: 70 }, armR: { a1: 30, a2: 70 }, legL: { a1: 5, a2: 0 }, legR: { a1: 5, a2: 0 }, tilt: 0, bodyY: 0, lookX: 0, lookY: 0 },
-  celebrating: { armL: { a1: 160, a2: -10 }, armR: { a1: 160, a2: -10 }, legL: { a1: 14, a2: 0 }, legR: { a1: 14, a2: 0 }, tilt: 0, bodyY: -8, lookX: 0, lookY: -4 },
+  idle: { armL: { a1: 14, a2: 8 }, armR: { a1: 14, a2: 8 }, legL: { a1: 3, a2: 0 }, legR: { a1: 3, a2: 0 }, tilt: 0, bodyY: 0, lookX: 0, lookY: 0 },
+  walking: { armL: { a1: 18, a2: 12 }, armR: { a1: 18, a2: 12 }, legL: { a1: 0, a2: 0 }, legR: { a1: 0, a2: 0 }, tilt: 2, bodyY: 0, lookX: 6, lookY: 0 },
+  running: { armL: { a1: 35, a2: 70 }, armR: { a1: 35, a2: 70 }, legL: { a1: 0, a2: 0 }, legR: { a1: 0, a2: 0 }, tilt: 8, bodyY: 0, lookX: 8, lookY: 0 },
+  sitting: { armL: { a1: 22, a2: 35 }, armR: { a1: 22, a2: 35 }, legL: { a1: -75, a2: 75 }, legR: { a1: -75, a2: 75 }, tilt: 0, bodyY: 58, lookX: 0, lookY: 0, sitting: true },
+  thinking: { armL: { a1: 12, a2: 6 }, armR: { a1: 26, a2: 172 }, legL: { a1: 3, a2: 0 }, legR: { a1: 3, a2: 0 }, tilt: -3, bodyY: 0, lookX: 10, lookY: -12, armsFront: true },
+  surprised: { armL: { a1: 62, a2: 38 }, armR: { a1: 62, a2: 38 }, legL: { a1: 7, a2: 0 }, legR: { a1: 7, a2: 0 }, tilt: 0, bodyY: -6, lookX: 0, lookY: -3 },
+  happy: { armL: { a1: 38, a2: 24 }, armR: { a1: 38, a2: 24 }, legL: { a1: 5, a2: 0 }, legR: { a1: 5, a2: 0 }, tilt: 0, bodyY: 0, lookX: 0, lookY: 0 },
+  sad: { armL: { a1: 5, a2: 0 }, armR: { a1: 5, a2: 0 }, legL: { a1: 2, a2: 0 }, legR: { a1: 2, a2: 0 }, tilt: 4, bodyY: 8, lookX: 0, lookY: 10 },
+  shocked: { armL: { a1: 148, a2: 18 }, armR: { a1: 148, a2: 18 }, legL: { a1: 10, a2: 0 }, legR: { a1: 10, a2: 0 }, tilt: 0, bodyY: -10, lookX: 0, lookY: -3 },
+  pointing: { armL: { a1: 14, a2: 8 }, armR: { a1: 90, a2: -4 }, legL: { a1: 4, a2: 0 }, legR: { a1: 4, a2: 0 }, tilt: 2, bodyY: 0, lookX: 12, lookY: 0 },
+  'holding-money': { armL: { a1: 14, a2: 8 }, armR: { a1: 55, a2: 50 }, legL: { a1: 3, a2: 0 }, legR: { a1: 3, a2: 0 }, tilt: 0, bodyY: 0, lookX: 10, lookY: 2, held: 'banknote' },
+  'holding-phone': { armL: { a1: 16, a2: 104 }, armR: { a1: 16, a2: 104 }, legL: { a1: 3, a2: 0 }, legR: { a1: 3, a2: 0 }, tilt: 0, bodyY: 0, lookX: 0, lookY: 14, held: 'phone', armsFront: true },
+  explaining: { armL: { a1: 32, a2: 72 }, armR: { a1: 32, a2: 72 }, legL: { a1: 4, a2: 0 }, legR: { a1: 4, a2: 0 }, tilt: 0, bodyY: 0, lookX: 0, lookY: 0 },
+  celebrating: { armL: { a1: 158, a2: -8 }, armR: { a1: 158, a2: -8 }, legL: { a1: 12, a2: 0 }, legR: { a1: 12, a2: 0 }, tilt: 0, bodyY: -8, lookX: 0, lookY: -5 },
 };
 
-const SHOULDER = { L: { x: 102, y: 318 }, R: { x: 298, y: 318 } };
-const HIP = { L: { x: 162, y: 418 }, R: { x: 238, y: 418 } };
-const ARM = [74, 66];
-const LEG = [92, 86];
+const SHOULDER = { L: { x: 94, y: 350 }, R: { x: 306, y: 350 } };
+const HIP = { L: { x: 166, y: 452 }, R: { x: 234, y: 452 } };
+const ARM = [60, 54];
+const LEG = [62, 56];
+const ARM_W = 30;
+const LEG_W = 36;
 
-function limbPoints(origin: { x: number; y: number }, side: 'L' | 'R', limb: Limb, lengths: number[]): Array<{ x: number; y: number }> {
+type Pt = { x: number; y: number };
+
+function limbPoints(origin: Pt, side: 'L' | 'R', limb: Limb, lengths: number[]): Pt[] {
   const sgn = side === 'L' ? -1 : 1;
   const r1 = (limb.a1 * Math.PI) / 180;
   const r2 = ((limb.a1 + limb.a2) * Math.PI) / 180;
@@ -69,86 +73,116 @@ function limbPoints(origin: { x: number; y: number }, side: 'L' | 'R', limb: Lim
   return [origin, elbow, end];
 }
 
-function LimbPath({ pts, width }: { pts: Array<{ x: number; y: number }>; width: number }) {
+function Limb({ pts, width, gap }: { pts: Pt[]; width: number; gap: boolean }) {
   const d = `M ${pts[0]!.x} ${pts[0]!.y} Q ${pts[1]!.x} ${pts[1]!.y} ${pts[2]!.x} ${pts[2]!.y}`;
   return (
     <>
-      <path d={d} stroke={INK} strokeWidth={width + OUTLINE * 2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-      <path d={d} stroke={WHITE} strokeWidth={width} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      {gap && <path d={d} stroke={INK} strokeWidth={width + GAP * 2} fill="none" strokeLinecap="round" />}
+      <path d={d} stroke={LIMB} strokeWidth={width} fill="none" strokeLinecap="round" />
+      <path d={d} stroke={LIMB_SHADE} strokeWidth={width * 0.28} fill="none" strokeLinecap="round" transform={`translate(${width * 0.22} 0)`} opacity={0.55} />
     </>
   );
 }
 
+/** Mitten hand: rounded palm + small thumb, oriented along the forearm. */
+function Hand({ at, from, gap }: { at: Pt; from: Pt; gap: boolean }) {
+  const ang = (Math.atan2(at.y - from.y, at.x - from.x) * 180) / Math.PI;
+  return (
+    <g transform={`translate(${at.x} ${at.y}) rotate(${ang})`}>
+      {gap && <circle cx={4} cy={0} r={22 + GAP} fill={INK} />}
+      <circle cx={4} cy={0} r={22} fill={LIMB} />
+      <ellipse cx={-4} cy={-15} rx={9} ry={11} fill={LIMB} />
+      <path d="M 14 -10 A 18 18 0 0 1 14 12" stroke={LIMB_SHADE} strokeWidth={4} fill="none" strokeLinecap="round" />
+    </g>
+  );
+}
+
+function Shoe({ at, side, gid }: { at: Pt; side: 'L' | 'R'; gid: string }) {
+  const dx = side === 'L' ? -10 : 10;
+  return (
+    <g transform={`translate(${at.x + dx} ${at.y + 10})`}>
+      <path d="M -36 6 C -36 -14 -16 -22 4 -22 C 26 -22 38 -10 38 6 C 38 13 32 16 24 16 L -28 16 C -33 16 -36 12 -36 6 Z" fill={`url(#${gid}-shoe)`} />
+      <path d="M -36 9 L 38 9" stroke="#C9C9D3" strokeWidth={3} />
+      <ellipse cx={-6} cy={-10} rx={14} ry={5} fill="#FFFFFF" opacity={0.75} />
+    </g>
+  );
+}
+
 function Eye({ cx, cy, expression, blink, lookX, lookY, side }: { cx: number; cy: number; expression: Expression; blink: number; lookX: number; lookY: number; side: 'L' | 'R' }) {
-  const big = expression === 'shocked' ? 1.32 : expression === 'surprised' ? 1.18 : expression === 'excited' ? 1.08 : 1;
-  const rx = 17 * big;
-  const ry = 25 * big * (1 - blink * 0.92);
+  const big = expression === 'shocked' ? 1.28 : expression === 'surprised' ? 1.15 : expression === 'excited' ? 1.06 : 1;
+  const rx = 19 * big;
+  const ry = 27 * big * (1 - blink * 0.94);
   const x = cx + lookX;
   const y = cy + lookY;
-  if (expression === 'happy') {
-    // Closed smiling eyes: ^ ^
-    return <path d={`M ${x - 17} ${y + 6} Q ${x} ${y - 20} ${x + 17} ${y + 6}`} stroke={INK} strokeWidth={9} fill="none" strokeLinecap="round" />;
+  if (expression === 'happy' || expression === 'excited') {
+    return <path d={`M ${x - 19} ${y + 8} Q ${x} ${y - 22} ${x + 19} ${y + 8}`} stroke={INK} strokeWidth={10} fill="none" strokeLinecap="round" />;
   }
+  const lidTop = y - ry - 14;
+  const lidFor = (l: number, r: number) => `M ${x - rx - 5} ${y - ry * l} L ${x + rx + 5} ${y - ry * r} L ${x + rx + 5} ${lidTop} L ${x - rx - 5} ${lidTop} Z`;
   const lid =
     expression === 'sad' || expression === 'worried'
       ? side === 'L'
-        ? `M ${x - rx - 4} ${y - ry * 0.55} L ${x + rx + 4} ${y - ry * 1.05} L ${x + rx + 4} ${y - ry - 12} L ${x - rx - 4} ${y - ry - 12} Z`
-        : `M ${x - rx - 4} ${y - ry * 1.05} L ${x + rx + 4} ${y - ry * 0.55} L ${x + rx + 4} ${y - ry - 12} L ${x - rx - 4} ${y - ry - 12} Z`
+        ? lidFor(0.5, 1.05)
+        : lidFor(1.05, 0.5)
       : expression === 'smug'
-        ? `M ${x - rx - 4} ${y - ry * 0.15} L ${x + rx + 4} ${y - ry * 0.15} L ${x + rx + 4} ${y - ry - 12} L ${x - rx - 4} ${y - ry - 12} Z`
+        ? lidFor(0.1, 0.1)
         : expression === 'determined'
           ? side === 'L'
-            ? `M ${x - rx - 4} ${y - ry * 0.95} L ${x + rx + 4} ${y - ry * 0.35} L ${x + rx + 4} ${y - ry - 12} L ${x - rx - 4} ${y - ry - 12} Z`
-            : `M ${x - rx - 4} ${y - ry * 0.35} L ${x + rx + 4} ${y - ry * 0.95} L ${x + rx + 4} ${y - ry - 12} L ${x - rx - 4} ${y - ry - 12} Z`
+            ? lidFor(1.0, 0.3)
+            : lidFor(0.3, 1.0)
           : null;
   return (
     <g>
-      <ellipse cx={x} cy={y} rx={rx} ry={Math.max(2, ry)} fill={INK} />
-      {ry > 8 && <circle cx={x + rx * 0.35} cy={y - ry * 0.4} r={5.5 * big} fill="#FFFFFF" />}
-      {ry > 8 && <circle cx={x - rx * 0.3} cy={y + ry * 0.35} r={2.4 * big} fill="#FFFFFF" opacity={0.8} />}
-      {lid && <path d={lid} fill={WHITE} />}
+      <ellipse cx={x} cy={y} rx={rx} ry={Math.max(2.5, ry)} fill={INK} />
+      {ry > 9 && (
+        <>
+          <ellipse cx={x + rx * 0.32} cy={y - ry * 0.42} rx={6.5 * big} ry={7.5 * big} fill="#FFFFFF" />
+          <circle cx={x - rx * 0.34} cy={y + ry * 0.38} r={2.8 * big} fill="#FFFFFF" opacity={0.7} />
+        </>
+      )}
+      {lid && <path d={lid} fill="var(--fvs-body, #F4F4F8)" />}
     </g>
   );
 }
 
 function Brows({ expression }: { expression: Expression }) {
-  const common = { stroke: INK, strokeWidth: 7, strokeLinecap: 'round' as const, fill: 'none' };
+  const p = { stroke: INK, strokeWidth: 8, strokeLinecap: 'round' as const, fill: 'none' };
   switch (expression) {
     case 'worried':
     case 'sad':
       return (
-        <g {...common}>
-          <path d="M 140 178 L 176 168" />
-          <path d="M 224 168 L 260 178" />
+        <g {...p}>
+          <path d="M 140 214 Q 158 204 178 206" />
+          <path d="M 222 206 Q 242 204 260 214" />
         </g>
       );
     case 'determined':
       return (
-        <g {...common}>
-          <path d="M 140 172 L 178 184" />
-          <path d="M 222 184 L 260 172" />
+        <g {...p}>
+          <path d="M 140 208 L 180 222" />
+          <path d="M 220 222 L 260 208" />
         </g>
       );
     case 'shocked':
     case 'surprised':
       return (
-        <g {...common}>
-          <path d="M 138 160 Q 158 146 180 156" />
-          <path d="M 220 156 Q 242 146 262 160" />
+        <g {...p}>
+          <path d="M 138 200 Q 160 184 182 194" />
+          <path d="M 218 194 Q 240 184 262 200" />
         </g>
       );
     case 'thinking':
       return (
-        <g {...common}>
-          <path d="M 142 182 L 178 182" />
-          <path d="M 222 170 Q 242 160 262 168" />
+        <g {...p}>
+          <path d="M 142 222 L 180 220" />
+          <path d="M 220 208 Q 242 196 262 204" />
         </g>
       );
     case 'smug':
       return (
-        <g {...common}>
-          <path d="M 142 186 L 178 182" />
-          <path d="M 222 178 Q 242 170 262 176" />
+        <g {...p}>
+          <path d="M 142 224 L 180 220" />
+          <path d="M 220 216 Q 242 206 262 212" />
         </g>
       );
     default:
@@ -157,53 +191,60 @@ function Brows({ expression }: { expression: Expression }) {
 }
 
 function Mouth({ expression, talk }: { expression: Expression; talk: number }) {
-  const y = 282;
-  const open = talk;
+  const y = 322;
+  const line = { stroke: INK, strokeWidth: 8, fill: 'none', strokeLinecap: 'round' as const };
   switch (expression) {
     case 'happy':
     case 'excited':
-      return <path d={`M 168 ${y - 4} Q 200 ${y + 34 + open * 6} 232 ${y - 4} Z`} fill={INK} stroke={INK} strokeWidth={4} strokeLinejoin="round" />;
+      return (
+        <g>
+          <path d={`M 166 ${y - 6} Q 200 ${y + 36 + talk * 6} 234 ${y - 6} Q 200 ${y + 4} 166 ${y - 6} Z`} fill={INK} stroke={INK} strokeWidth={4} strokeLinejoin="round" />
+          <path d={`M 186 ${y + 14 + talk * 3} Q 200 ${y + 6} 214 ${y + 14 + talk * 3} Q 200 ${y + 26 + talk * 5} 186 ${y + 14 + talk * 3} Z`} fill="#FF6B8A" />
+        </g>
+      );
     case 'sad':
-      return <path d={`M 178 ${y + 14} Q 200 ${y - 2} 222 ${y + 14}`} stroke={INK} strokeWidth={7} fill="none" strokeLinecap="round" />;
+      return <path d={`M 180 ${y + 14} Q 200 ${y - 2} 220 ${y + 14}`} {...line} />;
     case 'worried':
-      return <path d={`M 176 ${y + 8} Q 188 ${y} 200 ${y + 8} Q 212 ${y + 16} 224 ${y + 8}`} stroke={INK} strokeWidth={6} fill="none" strokeLinecap="round" />;
+      return <path d={`M 178 ${y + 8} Q 189 ${y} 200 ${y + 8} Q 211 ${y + 16} 222 ${y + 8}`} {...line} strokeWidth={7} />;
     case 'shocked':
-      return <ellipse cx={200} cy={y + 10} rx={15} ry={20 + open * 3} fill={INK} />;
+      return <ellipse cx={200} cy={y + 10} rx={16} ry={21 + talk * 3} fill={INK} />;
     case 'surprised':
-      return <ellipse cx={200} cy={y + 6} rx={10} ry={12 + open * 3} fill={INK} />;
+      return <ellipse cx={200} cy={y + 6} rx={11} ry={13 + talk * 3} fill={INK} />;
     case 'thinking':
-      return <path d={`M 186 ${y + 6} L 214 ${y + 2}`} stroke={INK} strokeWidth={7} fill="none" strokeLinecap="round" />;
+      return <path d={`M 186 ${y + 6} Q 200 ${y + 2} 214 ${y + 2}`} {...line} />;
     case 'smug':
-      return <path d={`M 180 ${y + 4} Q 206 ${y + 18} 226 ${y - 6}`} stroke={INK} strokeWidth={7} fill="none" strokeLinecap="round" />;
+      return <path d={`M 180 ${y + 4} Q 206 ${y + 18} 226 ${y - 6}`} {...line} />;
     case 'determined':
-      return <path d={`M 182 ${y + 6} Q 200 ${y + 12} 218 ${y + 6}`} stroke={INK} strokeWidth={7} fill="none" strokeLinecap="round" />;
+      return <path d={`M 182 ${y + 6} Q 200 ${y + 12} 218 ${y + 6}`} {...line} />;
     case 'neutral':
     default:
-      return open > 0.15 ? (
-        <ellipse cx={200} cy={y + 6} rx={13} ry={4 + open * 9} fill={INK} />
-      ) : (
-        <path d={`M 182 ${y + 2} Q 200 ${y + 16} 218 ${y + 2}`} stroke={INK} strokeWidth={7} fill="none" strokeLinecap="round" />
-      );
+      return talk > 0.15 ? <ellipse cx={200} cy={y + 6} rx={14} ry={5 + talk * 10} fill={INK} /> : <path d={`M 182 ${y + 2} Q 200 ${y + 16} 218 ${y + 2}`} {...line} />;
   }
 }
 
 function Held({ kind, x, y, accent }: { kind: 'phone' | 'banknote'; x: number; y: number; accent: string }) {
   if (kind === 'phone') {
     return (
-      <g transform={`translate(${x - 34} ${y - 70})`}>
-        <rect x={0} y={0} width={68} height={118} rx={12} fill={INK} stroke={INK} strokeWidth={4} />
-        <rect x={6} y={10} width={56} height={92} rx={6} fill="#2C2C30" />
-        <rect x={12} y={22} width={44} height={10} rx={4} fill={accent} />
-        <rect x={12} y={40} width={30} height={7} rx={3} fill="#5A5A60" />
-        <rect x={12} y={54} width={38} height={7} rx={3} fill="#5A5A60" />
+      <g transform={`translate(${x - 40} ${y - 92})`}>
+        <rect x={0} y={0} width={80} height={140} rx={16} fill="#1B1B21" stroke="#3A3A44" strokeWidth={3} />
+        <rect x={6} y={8} width={68} height={124} rx={11} fill="#0E0E12" />
+        <rect x={30} y={13} width={20} height={5} rx={2.5} fill="#2A2A32" />
+        <rect x={14} y={28} width={52} height={22} rx={6} fill={accent} />
+        <rect x={14} y={58} width={34} height={7} rx={3.5} fill="#4A4A55" />
+        <rect x={14} y={71} width={44} height={7} rx={3.5} fill="#4A4A55" />
+        <path d="M 16 118 L 30 104 L 42 110 L 62 90" stroke="#32D74B" strokeWidth={5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
       </g>
     );
   }
   return (
-    <g transform={`translate(${x - 10} ${y - 54}) rotate(-12)`}>
-      <rect x={0} y={0} width={120} height={60} rx={8} fill="#2FBF58" stroke={INK} strokeWidth={5} />
-      <rect x={10} y={10} width={100} height={40} rx={5} fill="none" stroke="#1E8F40" strokeWidth={3} />
-      <circle cx={60} cy={30} r={12} fill="#1E8F40" />
+    <g transform={`translate(${x - 6} ${y - 58}) rotate(-14)`}>
+      <rect x={0} y={0} width={128} height={64} rx={9} fill="#34C565" />
+      <rect x={0} y={0} width={128} height={64} rx={9} fill="none" stroke="#1F8A45" strokeWidth={3} />
+      <rect x={10} y={10} width={108} height={44} rx={6} fill="none" stroke="#5EE08A" strokeWidth={2.5} opacity={0.8} />
+      <circle cx={64} cy={32} r={14} fill="#1F8A45" />
+      <text x={64} y={39} textAnchor="middle" fontSize={20} fontWeight={900} fill="#9BF0B6" fontFamily="Arial, sans-serif">
+        €
+      </text>
     </g>
   );
 }
@@ -224,22 +265,22 @@ export interface MascotProps {
 }
 
 export const Mascot: React.FC<MascotProps> = ({ pose, expression, frame, fps, walking = false, walkSpeed = 1, talk = 0, accent = '#FFD60A', sprout = '#32D74B', seed = 0 }) => {
+  const gid = `m${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   const def = POSES[pose];
   const t = frame / fps;
   const isWalk = walking || pose === 'walking' || pose === 'running';
   const run = pose === 'running';
   const cycle = t * (run ? 2.6 : 1.7) * walkSpeed * Math.PI * 2;
   const breathe = Math.sin(t * 2.2 + seed) * (isWalk ? 0 : 1);
-  const bob = isWalk ? Math.abs(Math.sin(cycle)) * -10 : 0;
-  const hop = pose === 'celebrating' ? -Math.abs(Math.sin(t * 5)) * 22 : pose === 'happy' ? -Math.abs(Math.sin(t * 3.2)) * 6 : 0;
-  const shiver = pose === 'shocked' ? Math.sin(frame * 1.9) * 2.2 : 0;
+  const bob = isWalk ? Math.abs(Math.sin(cycle)) * -9 : 0;
+  const hop = pose === 'celebrating' ? -Math.abs(Math.sin(t * 5)) * 20 : pose === 'happy' ? -Math.abs(Math.sin(t * 3.2)) * 5 : 0;
+  const shiver = pose === 'shocked' ? Math.sin(frame * 1.9) * 2 : 0;
 
-  // Blink every ~3.4 s for 4 frames (never during shocked).
   const period = Math.round(fps * 3.4);
   const phase = (frame + Math.round(seed * 17)) % period;
   const blink = expression === 'shocked' ? 0 : phase < 2 ? phase / 2 : phase < 4 ? (4 - phase) / 2 : 0;
 
-  const swing = isWalk ? Math.sin(cycle) * (run ? 38 : 26) : 0;
+  const swing = isWalk ? Math.sin(cycle) * (run ? 36 : 24) : 0;
   const armL = { ...def.armL };
   const armR = { ...def.armR };
   const legL = { ...def.legL };
@@ -247,20 +288,20 @@ export const Mascot: React.FC<MascotProps> = ({ pose, expression, frame, fps, wa
   if (isWalk && !def.sitting) {
     legL.a1 = def.legL.a1 + swing;
     legR.a1 = def.legR.a1 - swing;
-    legL.a2 = Math.max(0, -Math.sin(cycle)) * (run ? 40 : 18);
-    legR.a2 = Math.max(0, Math.sin(cycle)) * (run ? 40 : 18);
+    legL.a2 = Math.max(0, -Math.sin(cycle)) * (run ? 36 : 16);
+    legR.a2 = Math.max(0, Math.sin(cycle)) * (run ? 36 : 16);
     if (pose === 'walking' || pose === 'running' || pose === 'idle') {
       armL.a1 = def.armL.a1 - swing * 0.6;
       armR.a1 = def.armR.a1 + swing * 0.6;
     }
   }
   if (pose === 'explaining') {
-    armL.a2 = def.armL.a2 + Math.sin(t * 4) * 14;
-    armR.a2 = def.armR.a2 + Math.sin(t * 4 + 1.4) * 14;
+    armL.a2 = def.armL.a2 + Math.sin(t * 4) * 12;
+    armR.a2 = def.armR.a2 + Math.sin(t * 4 + 1.4) * 12;
   }
   if (pose === 'celebrating') {
-    armL.a1 = def.armL.a1 + Math.sin(t * 9) * 10;
-    armR.a1 = def.armR.a1 - Math.sin(t * 9) * 10;
+    armL.a1 = def.armL.a1 + Math.sin(t * 9) * 9;
+    armR.a1 = def.armR.a1 - Math.sin(t * 9) * 9;
   }
   if (pose === 'pointing') armR.a1 = def.armR.a1 + Math.sin(t * 3) * 3;
 
@@ -272,58 +313,85 @@ export const Mascot: React.FC<MascotProps> = ({ pose, expression, frame, fps, wa
   };
   const sx = 1 + breathe * 0.006;
   const sy = 1 - breathe * 0.008;
-  const heldHand = def.heldHand === 'L' ? armPts.L[2]! : armPts.R[2]!;
-  const phoneCenter = pose === 'holding-phone' ? { x: 200, y: armPts.R[2]!.y - 6 } : heldHand;
+  const front = !!def.armsFront;
+  const heldAt = def.held === 'phone' ? { x: 200, y: Math.min(armPts.L[2]!.y, armPts.R[2]!.y) } : armPts.R[2]!;
 
   const arms = (
     <g>
-      <LimbPath pts={armPts.L} width={24} />
-      <LimbPath pts={armPts.R} width={24} />
-      <circle cx={armPts.L[2]!.x} cy={armPts.L[2]!.y} r={16} fill={WHITE} stroke={INK} strokeWidth={OUTLINE} />
-      <circle cx={armPts.R[2]!.x} cy={armPts.R[2]!.y} r={16} fill={WHITE} stroke={INK} strokeWidth={OUTLINE} />
+      <Limb pts={armPts.L} width={ARM_W} gap={front} />
+      <Limb pts={armPts.R} width={ARM_W} gap={front} />
+    </g>
+  );
+  const hands = (
+    <g>
+      <Hand at={armPts.L[2]!} from={armPts.L[1]!} gap={front} />
+      <Hand at={armPts.R[2]!} from={armPts.R[1]!} gap={front} />
     </g>
   );
 
   return (
     <svg viewBox={`0 0 ${MASCOT_VIEWBOX.width} ${MASCOT_VIEWBOX.height}`} width="100%" height="100%" style={{ overflow: 'visible' }}>
-      {/* ground shadow */}
-      <ellipse cx={200} cy={MASCOT_FEET_Y + 4} rx={108 - Math.abs(hop) * 0.8} ry={14} fill="#FFFFFF" opacity={0.08} />
-      {def.sitting && <rect x={120} y={470} width={160} height={110} rx={14} fill="#2A2A2E" stroke={INK} strokeWidth={OUTLINE} />}
-      <g transform={`translate(${shiver} 0)`}>
-        {/* legs */}
+      <defs>
+        <radialGradient id={`${gid}-body`} cx="38%" cy="28%" r="78%">
+          <stop offset="0%" stopColor="#FFFFFF" />
+          <stop offset="55%" stopColor="#F4F4F8" />
+          <stop offset="100%" stopColor="#D6D6E0" />
+        </radialGradient>
+        <linearGradient id={`${gid}-shoe`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#FFFFFF" />
+          <stop offset="100%" stopColor="#E2E2EA" />
+        </linearGradient>
+        <radialGradient id={`${gid}-floor`} cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#FFFFFF" stopOpacity={0.16} />
+          <stop offset="100%" stopColor="#FFFFFF" stopOpacity={0} />
+        </radialGradient>
+        <linearGradient id={`${gid}-leaf`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#7CF29A" />
+          <stop offset="100%" stopColor={sprout} />
+        </linearGradient>
+      </defs>
+      <ellipse cx={200} cy={MASCOT_FEET_Y + 2} rx={130 - Math.abs(hop) * 0.8} ry={18} fill={`url(#${gid}-floor)`} />
+      {def.sitting && (
         <g>
-          <LimbPath pts={legPts.L} width={26} />
-          <LimbPath pts={legPts.R} width={26} />
-          <ellipse cx={legPts.L[2]!.x - 8} cy={legPts.L[2]!.y + 2} rx={28} ry={15} fill={WHITE} stroke={INK} strokeWidth={OUTLINE} />
-          <ellipse cx={legPts.R[2]!.x + 8} cy={legPts.R[2]!.y + 2} rx={28} ry={15} fill={WHITE} stroke={INK} strokeWidth={OUTLINE} />
+          <rect x={112} y={486} width={176} height={100} rx={18} fill="#24242B" />
+          <rect x={112} y={486} width={176} height={18} rx={9} fill="#34343D" />
         </g>
-        {!def.armsFront && arms}
+      )}
+      <g transform={`translate(${shiver} 0)`}>
+        {/* legs + shoes */}
+        <Limb pts={legPts.L} width={LEG_W} gap={false} />
+        <Limb pts={legPts.R} width={LEG_W} gap={false} />
+        <Shoe at={legPts.L[2]!} side="L" gid={gid} />
+        <Shoe at={legPts.R[2]!} side="R" gid={gid} />
+        {!front && arms}
+        {!front && hands}
         {/* body */}
-        <g transform={`translate(200 ${300 + bodyY}) rotate(${def.tilt}) scale(${sx} ${sy}) translate(-200 -300)`}>
+        <g transform={`translate(200 ${330 + bodyY}) rotate(${def.tilt}) scale(${sx} ${sy}) translate(-200 -330)`} style={{ ['--fvs-body' as string]: '#F4F4F8' }}>
           {/* sprout */}
-          <path d="M 200 128 C 198 110 202 98 200 84" stroke={sprout} strokeWidth={7} fill="none" strokeLinecap="round" />
-          <path d="M 200 96 C 186 74 160 76 154 86 C 168 100 188 102 200 96 Z" fill={sprout} stroke={INK} strokeWidth={4} />
-          <path d="M 201 90 C 214 66 240 66 248 76 C 234 92 214 96 201 90 Z" fill={sprout} stroke={INK} strokeWidth={4} />
-          <path d="M 200 126 C 112 126 70 214 72 300 C 74 392 128 440 200 440 C 272 440 326 392 328 300 C 330 214 288 126 200 126 Z" fill={WHITE} stroke={INK} strokeWidth={OUTLINE} />
-          <path d="M 92 330 C 104 404 150 432 200 432 C 250 432 296 404 308 330 C 290 388 250 412 200 412 C 150 412 110 388 92 330 Z" fill={SHADE} />
+          <path d="M 200 156 C 197 138 203 124 200 108" stroke="#2BB24C" strokeWidth={7} fill="none" strokeLinecap="round" />
+          <path d="M 200 120 C 186 96 158 96 150 108 C 164 124 186 128 200 120 Z" fill={`url(#${gid}-leaf)`} />
+          <path d="M 198 119 C 184 110 168 108 156 108" stroke="#1E9A3E" strokeWidth={2.5} fill="none" strokeLinecap="round" opacity={0.7} />
+          <path d="M 201 114 C 214 88 242 88 252 100 C 238 118 216 122 201 114 Z" fill={`url(#${gid}-leaf)`} />
+          <path d="M 203 113 C 216 104 232 100 246 100" stroke="#1E9A3E" strokeWidth={2.5} fill="none" strokeLinecap="round" opacity={0.7} />
+          {/* egg body */}
+          <path d="M 200 152 C 110 152 66 246 68 332 C 70 422 128 474 200 474 C 272 474 330 422 332 332 C 334 246 290 152 200 152 Z" fill={`url(#${gid}-body)`} />
+          <ellipse cx={150} cy={212} rx={42} ry={22} transform="rotate(-28 150 212)" fill="#FFFFFF" opacity={0.85} />
           <g transform={`translate(${def.lookX * 0.5} ${def.lookY * 0.3})`}>
             <Brows expression={expression} />
-            <Eye cx={160} cy={222} side="L" expression={expression} blink={blink} lookX={def.lookX * 0.5} lookY={def.lookY * 0.4} />
-            <Eye cx={240} cy={222} side="R" expression={expression} blink={blink} lookX={def.lookX * 0.5} lookY={def.lookY * 0.4} />
+            <Eye cx={162} cy={262} side="L" expression={expression} blink={blink} lookX={def.lookX * 0.5} lookY={def.lookY * 0.4} />
+            <Eye cx={238} cy={262} side="R" expression={expression} blink={blink} lookX={def.lookX * 0.5} lookY={def.lookY * 0.4} />
             <Mouth expression={expression} talk={talk} />
           </g>
-          {(expression === 'happy' || expression === 'excited') && (
-            <g opacity={0.35}>
-              <ellipse cx={128} cy={266} rx={16} ry={9} fill="#FF7A9A" />
-              <ellipse cx={272} cy={266} rx={16} ry={9} fill="#FF7A9A" />
+          {(expression === 'happy' || expression === 'excited' || expression === 'smug') && (
+            <g opacity={0.32}>
+              <ellipse cx={126} cy={304} rx={18} ry={10} fill="#FF7A9A" />
+              <ellipse cx={274} cy={304} rx={18} ry={10} fill="#FF7A9A" />
             </g>
           )}
         </g>
-        {def.armsFront && arms}
-        {def.held && <Held kind={def.held} x={phoneCenter.x} y={phoneCenter.y} accent={accent} />}
-        {def.held === 'phone' && (
-          <circle cx={armPts.R[2]!.x} cy={armPts.R[2]!.y} r={16} fill={WHITE} stroke={INK} strokeWidth={OUTLINE} />
-        )}
+        {front && arms}
+        {def.held && <Held kind={def.held} x={heldAt.x} y={heldAt.y} accent={accent} />}
+        {front ? hands : def.held === 'banknote' ? <Hand at={armPts.R[2]!} from={armPts.R[1]!} gap={false} /> : null}
       </g>
     </svg>
   );

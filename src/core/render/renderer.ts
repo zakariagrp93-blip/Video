@@ -13,7 +13,7 @@ import { createLogger } from '../util/logger';
 const log = createLogger('render');
 export const COMPOSITION_ID = 'FinanceVideo';
 /** Bump when composition code changes in a way that invalidates cached scene chunks. */
-export const RENDER_ENGINE_VERSION = 'fvs-render-2';
+export const RENDER_ENGINE_VERSION = 'fvs-render-3';
 
 type RemotionRenderer = typeof import('@remotion/renderer');
 let rendererModule: Promise<RemotionRenderer> | undefined;

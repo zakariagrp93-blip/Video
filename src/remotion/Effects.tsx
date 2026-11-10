@@ -1,13 +1,11 @@
 import React from 'react';
 import { AbsoluteFill, interpolate, random } from 'remotion';
 import type { Effect } from '../shared/constants';
-import { ICONS } from './props/icons';
+import { IconContent } from './props/icons';
 
 const clamp = { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' } as const;
 
 const MoneyRain: React.FC<{ frame: number; accent: string }> = ({ frame, accent }) => {
-  const Note = ICONS.banknote;
-  const Coin = ICONS.coin;
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
       {Array.from({ length: 22 }, (_, i) => {
@@ -23,7 +21,7 @@ const MoneyRain: React.FC<{ frame: number; accent: string }> = ({ frame, accent 
         const isCoin = i % 4 === 0;
         return (
           <svg key={i} viewBox="0 0 200 200" width={size} height={size} style={{ position: 'absolute', left: x - size / 2, top: y, transform: `rotate(${rot}deg) rotateX(${Math.sin(f / 5 + i) * 60}deg)`, opacity: 0.92 }}>
-            {isCoin ? <Coin accent={accent} /> : <Note accent={accent} />}
+            <IconContent asset={isCoin ? 'coin' : 'banknote'} accent={accent} />
           </svg>
         );
       })}
@@ -32,7 +30,6 @@ const MoneyRain: React.FC<{ frame: number; accent: string }> = ({ frame, accent 
 };
 
 const CoinBurst: React.FC<{ frame: number; accent: string; cx: number; cy: number }> = ({ frame, accent, cx, cy }) => {
-  const Coin = ICONS.coin;
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
       {Array.from({ length: 16 }, (_, i) => {
@@ -47,7 +44,7 @@ const CoinBurst: React.FC<{ frame: number; accent: string; cx: number; cy: numbe
         const size = 56 + random(`cs${i}`) * 30;
         return (
           <svg key={i} viewBox="0 0 200 200" width={size} height={size} style={{ position: 'absolute', left: x - size / 2, top: y - size / 2, opacity: op, transform: `rotate(${t * 12}deg)` }}>
-            <Coin accent={accent} />
+            <IconContent asset="coin" accent={accent} />
           </svg>
         );
       })}

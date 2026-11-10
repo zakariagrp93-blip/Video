@@ -15,14 +15,14 @@ import { PropIcon } from './props/icons';
 /* Stage layout (1080x1920). Top band: overlays. Middle: stage. y≥1420: captions. */
 export const BASELINE_Y = 1330;
 export const CHAR_X: Record<CharacterPosition, number> = { left: 290, center: 540, right: 790 };
-const CHAR_SCALE = 1.12;
+const CHAR_SCALE = 1.22;
 
 const SLOTS: Record<Exclude<PropPlacement, 'around' | 'hand'>, { x: number; y: number; size: number }> = {
-  left: { x: 240, y: 1050, size: 330 },
-  right: { x: 840, y: 1050, size: 330 },
-  top: { x: 540, y: 585, size: 240 },
-  'top-left': { x: 260, y: 640, size: 260 },
-  'top-right': { x: 820, y: 640, size: 260 },
+  left: { x: 230, y: 1040, size: 360 },
+  right: { x: 850, y: 1040, size: 360 },
+  top: { x: 540, y: 560, size: 250 },
+  'top-left': { x: 240, y: 620, size: 280 },
+  'top-right': { x: 840, y: 620, size: 280 },
   bottom: { x: 540, y: 1250, size: 210 },
   center: { x: 540, y: 930, size: 300 },
 };
@@ -49,10 +49,14 @@ function layoutProps(scene: PlannedScene, charX: number, facing: 1 | -1, fps: nu
       }
       return;
     }
+    // "bottom" objects stand on the floor beside the mascot (never in front of its legs).
+    const floorX = charX <= 300 ? charX + 330 : charX >= 780 ? charX - 330 : charX + 310;
     const slot =
       p.placement === 'hand'
-        ? { x: charX + facing * 165, y: 1010, size: 150 }
-        : SLOTS[p.placement];
+        ? { x: charX + facing * 175, y: 1000, size: 160 }
+        : p.placement === 'bottom'
+          ? { x: floorX, y: BASELINE_Y - 115, size: 230 }
+          : SLOTS[p.placement];
     const size = n > 1 ? slot.size * Math.max(0.55, 1 - n * 0.08) : slot.size;
     for (let i = 0; i < n; i++) {
       const dx = (i - (n - 1) / 2) * size * 0.5;

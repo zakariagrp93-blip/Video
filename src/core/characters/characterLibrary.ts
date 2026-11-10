@@ -5,11 +5,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { DEFAULT_THEME, EXPRESSIONS, POSES, PROP_ASSETS, type Expression, type Pose, type PropAsset } from '../../shared/constants';
 import type { Storyboard } from '../../shared/schemas';
 import { Mascot } from '../../remotion/Mascot';
-import { ICONS } from '../../remotion/props/icons';
+import { IconContent } from '../../remotion/props/icons';
 import { ensureDir, exists, readJsonIfExists, safeJoin, writeFileAtomic, writeJson } from '../util/fsx';
 
 /** Bump when the mascot drawing changes so libraries are regenerated. */
-export const CHARACTER_VERSION = 'nummo-1';
+export const CHARACTER_VERSION = 'nummo-2';
 
 export interface CharacterManifest {
   id: string;
@@ -30,8 +30,7 @@ function mascotSvg(pose: Pose, expression: Expression): string {
 }
 
 export function propSvg(asset: PropAsset, accent = DEFAULT_THEME.accent): string {
-  const Icon = ICONS[asset];
-  const inner = renderToStaticMarkup(React.createElement(Icon, { accent }));
+  const inner = renderToStaticMarkup(React.createElement(IconContent, { asset, accent }));
   return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="400" height="400">${inner}</svg>`;
 }
 
