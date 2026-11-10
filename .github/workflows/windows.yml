@@ -50,10 +50,11 @@ jobs:
         run: node dist/cli/generate.cjs --topic "What if you received €1 million at age 18?" --lang fr --duration 60 --narrator female --data fvs-ci-data --out output/test-video-1-million-18-ans.mp4
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: finance-video-studio-windows
           path: |
             release/*.exe
             output/*.mp4
-            ui-screenshots/*.png
+            ui-screenshots/*
           retention-days: 14
