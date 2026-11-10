@@ -19,7 +19,7 @@ const EXPR: Record<string, Expression> = {
 };
 
 /** Demo plan showing every pose with props — used as Remotion Studio default props and in render tests. */
-export function samplePlan(scenesCount = POSES.length, sceneSeconds = 2): VideoPlan {
+export function samplePlan(scenesCount: number = POSES.length, sceneSeconds = 2): VideoPlan {
   const dur = Math.round(sceneSeconds * VIDEO_FPS);
   const scenes: PlannedScene[] = POSES.slice(0, scenesCount).map((pose, i) => ({
     id: `s${String(i + 1).padStart(2, '0')}`,

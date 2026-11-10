@@ -20,7 +20,7 @@ const CHAR_SCALE = 1.12;
 const SLOTS: Record<Exclude<PropPlacement, 'around' | 'hand'>, { x: number; y: number; size: number }> = {
   left: { x: 240, y: 1050, size: 330 },
   right: { x: 840, y: 1050, size: 330 },
-  top: { x: 540, y: 620, size: 270 },
+  top: { x: 540, y: 585, size: 240 },
   'top-left': { x: 260, y: 640, size: 260 },
   'top-right': { x: 820, y: 640, size: 260 },
   bottom: { x: 540, y: 1250, size: 210 },
