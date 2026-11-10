@@ -3,7 +3,8 @@ import path from 'node:path';
 import { z } from 'zod';
 import { LANGUAGES, PIPELINE_STAGES } from '../src/shared/constants';
 import type { DashboardDTO, FvsApi, ProjectDetailDTO, ProviderInfoDTO, SystemInfoDTO } from '../src/shared/ipc';
-import { GenerationOptionsSchema, SECRET_KEYS, SettingsSchema, TTS_PROVIDERS, type GenerationOptions } from '../src/shared/schemas';
+import { GenerationOptionsSchema, SECRET_KEYS, TTS_PROVIDERS, type GenerationOptions } from '../src/shared/schemas';
+import { parseSettingsPatch } from '../src/core/settings/settingsStore';
 import { projectPaths } from '../src/core/projects/projectStore';
 import { PiperTTSProvider } from '../src/core/providers/tts/piper/piperTts';
 import type { Studio } from '../src/core/studio';
@@ -23,7 +24,6 @@ export interface HostServices {
 }
 
 const id = z.string().regex(/^[a-z0-9-]+$/i).max(64);
-const SettingsPatch = SettingsSchema.partial();
 
 /**
  * All renderer-callable operations. Every argument is validated with zod: the
@@ -127,7 +127,7 @@ export function createHandlers(studio: Studio, host: HostServices): Omit<FvsApi,
     async getSettings() {
       return { settings: studio.settings.get(), secrets: studio.secrets.status() };
     },
-    updateSettings: (raw) => studio.settings.update(SettingsPatch.parse(raw)),
+    updateSettings: (raw) => studio.settings.update(parseSettingsPatch(raw)),
     async setSecret(rawKey, rawValue) {
       const key = z.enum(SECRET_KEYS).parse(rawKey);
       const value = z.string().max(400).nullable().parse(rawValue);

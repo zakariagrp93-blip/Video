@@ -13,6 +13,18 @@ export interface SecretCipher {
   decrypt(data: Buffer): string;
 }
 
+/**
+ * Validate a partial settings update. Zod 4 applies `.default()` values even to
+ * keys missing from a `.partial()` input, which would silently reset every other
+ * setting — so only the keys actually present in the input are kept.
+ */
+export function parseSettingsPatch(raw: unknown): Partial<Settings> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Invalid settings update');
+  const parsed = SettingsSchema.partial().parse(raw) as Record<string, unknown>;
+  const present = new Set(Object.keys(raw as Record<string, unknown>));
+  return Object.fromEntries(Object.entries(parsed).filter(([k]) => present.has(k))) as Partial<Settings>;
+}
+
 export class SettingsStore {
   private settings: Settings;
 

@@ -55,6 +55,18 @@ if (secure) {
   console.log('secure storage unavailable on this host: key correctly refused');
 }
 
+// Regression: entering an ElevenLabs voice ID must not reset the TTS provider.
+await win.selectOption('.field:has-text("Voice (TTS)") select', 'elevenlabs');
+await win.waitForSelector('text=Female voice ID');
+const femaleInput = win.locator('.field:has-text("Female voice ID") input');
+await femaleInput.fill('test-voice-id-123');
+await femaleInput.press('Enter');
+await win.waitForTimeout(500);
+const afterVoice = await win.evaluate(() => window.fvs.getSettings().then((r) => ({ tts: r.settings.ttsProvider, id: r.settings.voices.elevenlabs.female })));
+assert(afterVoice.tts === 'elevenlabs' && afterVoice.id === 'test-voice-id-123', `voice ID edit reset settings: ${JSON.stringify(afterVoice)}`);
+await win.selectOption('.field:has-text("Voice (TTS)") select', 'piper');
+await win.waitForSelector('tr:has-text("Gilles")');
+
 // Real voice download through Electron's network stack.
 await win.click('tr:has-text("Gilles") >> text=Download');
 await win.waitForSelector('tr:has-text("Gilles") >> text=Installed', { timeout: 300_000 });
