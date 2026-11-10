@@ -115,33 +115,46 @@ export function writeMotivation(opts: { topic: string; language: 'fr' | 'en'; wo
   for (const section of plan) {
     if (section === 'hook' && userHook) {
       const words = userHook.replace(/[.!?…]+$/, '').split(/\s+/);
-      const key = [...words].sort((a, b) => b.length - a.length)[0]!.replace(/[^\p{L}\p{N}'’-]/gu, '');
+      // The punchline is the last word ("…te rendre *riche*").
+      const key = words[words.length - 1]!.replace(/[^\p{L}\p{N}'’-]/gu, '');
       beats.push({ text: userHook, emphasis: [key], negative: [], motif: parseLine(pools.hook[0]!, 'hook').motif, hero: parseLine(pools.hook[0]!, 'hook').hero, hit: false, section });
       firstCount.set(firstWord(userHook), 2);
       motifCount.set(beats[0]!.motif, 1);
       continue;
     }
-    // Borrow from the neighbouring section when a pool runs dry.
-    const order: Section[] = [section, ...(['truth', 'grind', 'vision', 'pain'] as Section[]).filter((s) => s !== section)];
+    // Variety first, arc second: try the section's own lines from the strictest rule to the
+    // loosest, then borrow from neighbouring sections, and only then accept a repeat.
+    // Rules: an opening word at most twice (the hook's never again), never the same shot twice
+    // in a row, and a shot reused at most once (hero objects excepted).
+    const others = (['truth', 'grind', 'vision', 'pain'] as Section[]).filter((x) => x !== section);
+    const prev = beats[beats.length - 1];
+    const rule = (level: number) => (l: string, s: Section) => {
+      const b = parseLine(l, s);
+      const fw = (firstCount.get(firstWord(b.text)) ?? 0) < 2;
+      const varied = !prev || prev.motif !== b.motif;
+      const uses = motifCount.get(b.motif) ?? 0;
+      const fresh = b.motif === 'spotlight' || uses < (level === 0 ? 1 : 2);
+      // Tight budgets (30 s) prefer lines that fit the per-line word budget.
+      const fits = !tight || wordCount(b.text) <= Math.ceil(max / n) + 2;
+      return level >= 3 || (fw && varied && fresh && fits);
+    };
+    const tiers: Array<[Section[], number]> = [
+      [[section], 0],
+      [[section], 1],
+      [others, 0],
+      [others, 1],
+      [[section, ...others], 3],
+    ];
     let picked: EditBeat | null = null;
-    for (const s of order) {
-      const pool = pools[s];
-      // Variety: an opening word at most twice (the hook's once), a shot at most twice (hero objects excepted), never twice in a row.
-      const ok = (l: string, strict: boolean) => {
-        const b = parseLine(l, s);
-        const prev = beats[beats.length - 1];
-        const fw = (firstCount.get(firstWord(b.text)) ?? 0) < 2;
-        const varied = !prev || prev.motif !== b.motif;
-        const fresh = b.motif === 'spotlight' || (motifCount.get(b.motif) ?? 0) < 2;
-        return fw && varied && (!strict || fresh);
-      };
-      let idx = pool.findIndex((l) => ok(l, true));
-      if (idx < 0) idx = pool.findIndex((l) => ok(l, false));
-      const i = idx >= 0 ? idx : pool.length ? 0 : -1;
-      if (i < 0) continue;
-      picked = { ...parseLine(pool[i]!, s), section };
-      pool.splice(i, 1);
-      break;
+    for (const [sections, level] of tiers) {
+      for (const s of sections) {
+        const i = pools[s].findIndex((l) => rule(level)(l, s));
+        if (i < 0) continue;
+        picked = { ...parseLine(pools[s][i]!, s), section };
+        pools[s].splice(i, 1);
+        break;
+      }
+      if (picked) break;
     }
     if (!picked) break;
     firstCount.set(firstWord(picked.text), (firstCount.get(firstWord(picked.text)) ?? 0) + (section === 'hook' ? 2 : 1));
@@ -151,8 +164,13 @@ export function writeMotivation(opts: { topic: string; language: 'fr' | 'en'; wo
   // Too long: drop middle beats (never the hook or the close) until the length fits.
   const total = () => beats.reduce((a, b) => a + wordCount(b.text), 0);
   while (total() > max && beats.length > 8) {
-    let longest = 1;
-    for (let i = 2; i < beats.length - 1; i++) if (wordCount(beats[i]!.text) > wordCount(beats[longest]!.text)) longest = i;
+    // Drop the longest middle line whose removal does not put the same shot twice in a row.
+    let longest = -1;
+    for (let i = 1; i < beats.length - 1; i++) {
+      if (beats[i - 1]!.motif === beats[i + 1]!.motif && beats[i + 1]!.motif !== 'spotlight') continue;
+      if (longest < 0 || wordCount(beats[i]!.text) > wordCount(beats[longest]!.text)) longest = i;
+    }
+    if (longest < 0) longest = 1;
     beats.splice(longest, 1);
   }
   // The drop lands on the second line: make it hit.

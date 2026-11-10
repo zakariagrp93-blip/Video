@@ -55,6 +55,12 @@ describe('motivation writer', () => {
         expect(sb.scenes[1]!.effect).toBe('impact');
         // Consecutive shots differ (except two hero objects in a row).
         for (let i = 1; i < sb.scenes.length; i++) if (sb.scenes[i]!.motif !== 'spotlight') expect(sb.scenes[i]!.motif).not.toBe(sb.scenes[i - 1]!.motif);
+        // A shot is used at most twice; the hook's opening word is never reused.
+        const uses = new Map<string, number>();
+        for (const sc of sb.scenes) if (sc.motif !== 'spotlight') uses.set(sc.motif!, (uses.get(sc.motif!) ?? 0) + 1);
+        expect(Math.max(0, ...uses.values())).toBeLessThanOrEqual(2);
+        const first = (t: string) => t.split(/\s+/)[0]!.toLowerCase();
+        expect(script.scenes.slice(1).filter((x) => first(x.narration) === first(script.scenes[0]!.narration))).toEqual([]);
       }
     }
   });
