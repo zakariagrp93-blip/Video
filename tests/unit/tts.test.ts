@@ -32,9 +32,17 @@ describe('Piper TTS (local neural voice)', () => {
     expect(again.cached).toBe(true);
     expect(again.samples.length).toBe(res.samples.length);
     expect(usage.length).toBe(2);
-    // Slower speech must be longer
-    const slow = await tts.synthesize({ text, language: 'fr', voiceId: voice.id, speed: 0.8 }, ctx);
-    expect(slow.samples.length).toBeGreaterThan(res.samples.length * 1.1);
+    // Slower speech must be longer. Piper durations are stochastic (±6 % run to run),
+    // so compare averages of fresh, uncached syntheses at clearly different speeds.
+    const avgLen = async (speed: number) => {
+      let total = 0;
+      for (let i = 0; i < 3; i++) {
+        const fresh = (await testContext('tts-speed')).ctx;
+        total += (await tts.synthesize({ text, language: 'fr', voiceId: voice.id, speed }, fresh)).samples.length;
+      }
+      return total / 3;
+    };
+    expect(await avgLen(0.7)).toBeGreaterThan((await avgLen(1)) * 1.15);
 
     // Alignment on real audio: monotonic, inside the audio, pause detected at the comma.
     const { silences } = detectSilences(res.samples, res.sampleRate);
