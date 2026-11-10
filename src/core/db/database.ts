@@ -77,7 +77,11 @@ export class AppDatabase {
 
   static async open(file: string | null): Promise<AppDatabase> {
     const SQL = await initSqlJs({
-      locateFile: (f: string) => path.join(path.dirname(require_.resolve('sql.js')), f),
+      locateFile: (f: string) => {
+        const p = path.join(path.dirname(require_.resolve('sql.js')), f);
+        const unpacked = p.replace(/app\.asar([\\/])/, 'app.asar.unpacked$1');
+        return fs.existsSync(unpacked) ? unpacked : p;
+      },
     });
     let db: SqlDatabase;
     if (file && fs.existsSync(file)) {

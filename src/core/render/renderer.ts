@@ -27,6 +27,8 @@ export interface RenderEnvironment {
   serveUrl: string;
   /** Optional Chrome / chrome-headless-shell binary; otherwise Remotion's managed browser is used. */
   browserExecutable?: string | null;
+  /** Folder containing Remotion's compositor binaries (set in packaged apps, where node_modules is inside app.asar). */
+  binariesDirectory?: string | null;
   concurrency: number;
   quality: ExportQuality;
   ffmpeg: FFmpeg;
@@ -99,6 +101,7 @@ export async function renderSceneChunks(
     id: COMPOSITION_ID,
     inputProps,
     browserExecutable: env.browserExecutable || null,
+    binariesDirectory: env.binariesDirectory || null,
     chromiumOptions: { gl: 'swiftshader' },
     logLevel: 'error',
   });
@@ -142,6 +145,7 @@ export async function renderSceneChunks(
         jpegQuality: 95,
         concurrency: env.concurrency,
         browserExecutable: env.browserExecutable || null,
+        binariesDirectory: env.binariesDirectory || null,
         chromiumOptions: { gl: 'swiftshader' },
         cancelSignal,
         logLevel: 'error',
@@ -245,18 +249,20 @@ export async function extractThumbnail(video: string, out: string, atSec: number
   await ffmpeg.run(['-ss', atSec.toFixed(2), '-i', video, '-frames:v', '1', '-vf', 'scale=360:-2', '-q:v', '3', out]);
 }
 
-export async function renderStillFrame(plan: VideoPlan, frame: number, out: string, env: Pick<RenderEnvironment, 'serveUrl' | 'browserExecutable'>): Promise<void> {
+export async function renderStillFrame(plan: VideoPlan, frame: number, out: string, env: Pick<RenderEnvironment, 'serveUrl' | 'browserExecutable' | 'binariesDirectory'>): Promise<void> {
   assertBrowserExecutable(env.browserExecutable);
   const R = await loadRenderer();
   const inputProps = { plan };
-  const composition = await R.selectComposition({ serveUrl: env.serveUrl, id: COMPOSITION_ID, inputProps, browserExecutable: env.browserExecutable || null, logLevel: 'error' });
-  await R.renderStill({ composition, serveUrl: env.serveUrl, output: out, frame, inputProps, imageFormat: 'png', browserExecutable: env.browserExecutable || null, logLevel: 'error', overwrite: true });
+  const common = { browserExecutable: env.browserExecutable || null, binariesDirectory: env.binariesDirectory || null, logLevel: 'error' as const };
+  const composition = await R.selectComposition({ serveUrl: env.serveUrl, id: COMPOSITION_ID, inputProps, ...common });
+  await R.renderStill({ composition, serveUrl: env.serveUrl, output: out, frame, inputProps, imageFormat: 'png', overwrite: true, ...common });
 }
 
 /** Rasterise the mascot reference sheet (used by image providers that accept reference images). */
-export async function renderCharacterSheet(out: string, env: Pick<RenderEnvironment, 'serveUrl' | 'browserExecutable'>): Promise<void> {
+export async function renderCharacterSheet(out: string, env: Pick<RenderEnvironment, 'serveUrl' | 'browserExecutable' | 'binariesDirectory'>): Promise<void> {
   assertBrowserExecutable(env.browserExecutable);
   const R = await loadRenderer();
-  const composition = await R.selectComposition({ serveUrl: env.serveUrl, id: 'CharacterSheet', inputProps: {}, browserExecutable: env.browserExecutable || null, logLevel: 'error' });
-  await R.renderStill({ composition, serveUrl: env.serveUrl, output: out, frame: 0, inputProps: {}, imageFormat: 'png', browserExecutable: env.browserExecutable || null, logLevel: 'error', overwrite: true });
+  const common = { browserExecutable: env.browserExecutable || null, binariesDirectory: env.binariesDirectory || null, logLevel: 'error' as const };
+  const composition = await R.selectComposition({ serveUrl: env.serveUrl, id: 'CharacterSheet', inputProps: {}, ...common });
+  await R.renderStill({ composition, serveUrl: env.serveUrl, output: out, frame: 0, inputProps: {}, imageFormat: 'png', overwrite: true, ...common });
 }

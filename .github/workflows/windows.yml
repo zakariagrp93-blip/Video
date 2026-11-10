@@ -1,0 +1,59 @@
+name: Windows build & tests
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 75
+    env:
+      FVS_QUIET: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (typecheck, renderer, main, animation bundle)
+        run: npm run build
+
+      - name: Unit tests
+        run: npm test
+
+      - name: End-to-end tests (render + full pipeline)
+        run: npm run test:e2e
+
+      - name: Package Windows installer
+        run: |
+          node scripts/prepare-win.mjs
+          npx electron-builder --win nsis --x64 --publish never
+
+      - name: UI end-to-end test against the packaged app
+        shell: bash
+        run: FVS_APP_EXECUTABLE="$PWD/release/win-unpacked/Finance Video Studio.exe" node tests/e2e/ui.e2e.mjs ui-screenshots
+
+      - name: Generate the reference test video
+        shell: bash
+        run: node dist/cli/generate.cjs --topic "What if you received €1 million at age 18?" --lang fr --duration 60 --narrator female --data fvs-ci-data --out output/test-video-1-million-18-ans.mp4
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: finance-video-studio-windows
+          path: |
+            release/*.exe
+            output/*.mp4
+            ui-screenshots/*.png
+          retention-days: 14

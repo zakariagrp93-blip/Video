@@ -15,7 +15,11 @@ async function loadFactory(): Promise<ESpeakFactory> {
   // espeak-ng ships as an ES module; dynamic import keeps CJS bundles working.
   factoryPromise ??= (async () => {
     const require_ = createRequire(typeof __filename !== 'undefined' ? __filename : import.meta.url);
-    const entry = require_.resolve('espeak-ng');
+    // In packaged apps the module lives in app.asar.unpacked (ESM + WASM cannot load from inside an asar archive).
+    const resolved = require_.resolve('espeak-ng');
+    const unpacked = resolved.replace(/app\.asar([\\/])/, 'app.asar.unpacked$1');
+    const { existsSync } = await import('node:fs');
+    const entry = existsSync(unpacked) ? unpacked : resolved;
     const { pathToFileURL } = await import('node:url');
     const mod = (await import(/* @vite-ignore */ pathToFileURL(entry).href)) as { default: ESpeakFactory };
     return mod.default;

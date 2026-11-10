@@ -37,6 +37,18 @@ function appRoot(): string {
   return app.isPackaged ? process.resourcesPath : path.resolve(__dirname, '..', '..');
 }
 
+function compositorPackage(): string | null {
+  const key = `${process.platform}-${process.arch}`;
+  const map: Record<string, string> = {
+    'win32-x64': 'compositor-win32-x64-msvc',
+    'darwin-arm64': 'compositor-darwin-arm64',
+    'darwin-x64': 'compositor-darwin-x64',
+    'linux-x64': 'compositor-linux-x64-gnu',
+    'linux-arm64': 'compositor-linux-arm64-gnu',
+  };
+  return map[key] ?? null;
+}
+
 function remotionBundlePath(): string {
   return app.isPackaged ? path.join(process.resourcesPath, 'remotion-bundle') : path.join(appRoot(), 'build', 'remotion-bundle');
 }
@@ -109,6 +121,14 @@ app.whenReady().then(async () => {
   app.setAppUserModelId('com.financevideostudio.app');
   setFetchImplementation((input, init) => net.fetch(input, init as never));
   const dataDir = process.env.FVS_DATA_DIR ?? app.getPath('userData');
+  if (app.isPackaged) {
+    // Native binaries are unpacked next to app.asar; Remotion downloads its browser relative to cwd.
+    const compositor = compositorPackage();
+    if (compositor) process.env.FVS_REMOTION_BINARIES = path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', '@remotion', compositor);
+    const runtime = path.join(dataDir, 'runtime');
+    fs.mkdirSync(runtime, { recursive: true });
+    process.chdir(runtime);
+  }
   studio = await Studio.create({ paths: defaultPaths(dataDir, remotionBundlePath()), cipher: electronCipher, persist: true });
   registerMediaProtocol(studio.paths.projectsDir);
 

@@ -17,27 +17,27 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "test:ui": "node tests/e2e/ui.e2e.mjs",
+    "test:all": "npm run test && npm run test:e2e && npm run test:ui",
+    "generate": "node dist/cli/generate.cjs",
+    "studio": "remotion studio src/remotion/index.ts",
     "start": "electron .",
-    "dist:win": "npm run build && node scripts/prepare-win.mjs && electron-builder --win nsis --x64"
+    "icons": "node scripts/make-icons.mjs",
+    "dist:win": "npm run build && node scripts/prepare-win.mjs && electron-builder --win nsis --x64 --publish never"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^1.7.0",
-    "@remotion/renderer": "^4.0.542",
+    "@remotion/renderer": "4.0.542",
     "espeak-ng": "^1.0.2",
     "ffmpeg-static": "^5.3.0",
     "ffprobe-static": "^3.1.0",
     "onnxruntime-node": "^1.31.1",
-    "openai": "^7.54.0",
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1",
-    "remotion": "^4.0.542",
-    "sql.js": "^1.15.2",
-    "tar": "^7.5.22",
-    "zod": "^4.6.7"
+    "sql.js": "^1.15.2"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^1.7.0",
     "@fontsource/montserrat": "^5.3.0",
-    "@remotion/bundler": "^4.0.542",
+    "@remotion/bundler": "4.0.542",
+    "@remotion/cli": "4.0.542",
     "@types/node": "^22.20.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
@@ -48,10 +48,79 @@
     "electron": "^45.2.3",
     "electron-builder": "^26.18.0",
     "esbuild": "^0.28.2",
+    "openai": "^7.54.0",
     "playwright-core": "^1.65.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "remotion": "4.0.542",
+    "tar": "^7.5.22",
     "typescript": "^7.0.2",
     "vite": "^8.3.7",
     "vitest": "^5.1.0",
-    "wait-on": "^9.5.1"
+    "wait-on": "^9.5.1",
+    "zod": "^4.6.7"
+  },
+  "build": {
+    "appId": "com.financevideostudio.app",
+    "productName": "Finance Video Studio",
+    "copyright": "Copyright \u00a9 2026 Finance Video Studio",
+    "directories": {
+      "output": "release",
+      "buildResources": "assets"
+    },
+    "files": [
+      "dist/main/**/*",
+      "dist/renderer/**/*",
+      "!**/*.map",
+      "package.json",
+      "!node_modules/onnxruntime-node/bin/napi-v*/darwin/**",
+      "!node_modules/onnxruntime-node/bin/napi-v*/linux/**",
+      "!node_modules/ffprobe-static/bin/darwin/**",
+      "!node_modules/ffprobe-static/bin/linux/**",
+      "!node_modules/ffprobe-static/bin/win32/ia32/**",
+      "!node_modules/@remotion/compositor-linux-*/**",
+      "!node_modules/@remotion/compositor-darwin-*/**",
+      "!node_modules/ffmpeg-static/ffmpeg",
+      "!node_modules/onnxruntime-node/bin/napi-v*/win32/arm64/**"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/onnxruntime-node/**",
+      "node_modules/ffmpeg-static/**",
+      "node_modules/ffprobe-static/**",
+      "node_modules/@remotion/compositor-*/**",
+      "node_modules/espeak-ng/**",
+      "node_modules/sql.js/**"
+    ],
+    "extraResources": [
+      {
+        "from": "build/remotion-bundle",
+        "to": "remotion-bundle"
+      }
+    ],
+    "npmRebuild": false,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "artifactName": "Finance-Video-Studio-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Finance Video Studio",
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "deleteAppDataOnUninstall": false
+    }
   }
 }

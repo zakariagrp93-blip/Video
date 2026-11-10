@@ -114,6 +114,7 @@ export class Studio {
     return {
       serveUrl: bundle,
       browserExecutable: s.browserExecutable || process.env.FVS_BROWSER || null,
+      binariesDirectory: process.env.FVS_REMOTION_BINARIES || null,
       concurrency: s.renderConcurrency,
       quality: s.exportQuality,
       ffmpeg: this.ffmpeg(),

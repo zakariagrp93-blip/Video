@@ -18,9 +18,11 @@ const assert = (cond, msg) => {
   if (!cond) throw new Error(`Assertion failed: ${msg}`);
 };
 
+// FVS_APP_EXECUTABLE runs the test against a packaged build instead of the dev tree.
+const packaged = process.env.FVS_APP_EXECUTABLE;
 const app = await electron.launch({
-  executablePath: require('electron'),
-  args: ['.', '--no-sandbox'],
+  executablePath: packaged ?? require('electron'),
+  args: packaged ? ['--no-sandbox'] : ['.', '--no-sandbox'],
   env: { ...process.env, FVS_DATA_DIR: dataDir, ELECTRON_DISABLE_SECURITY_WARNINGS: '1' },
 });
 const win = await app.firstWindow();

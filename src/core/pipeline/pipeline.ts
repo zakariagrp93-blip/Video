@@ -23,7 +23,7 @@ import { exportVectorIllustrations } from '../characters/characterLibrary';
 import { projectPaths, type ProjectPaths } from '../projects/projectStore';
 import type { ProviderContext } from '../providers/types';
 import { startAssetServer } from '../render/assetServer';
-import { assembleFinal, extractThumbnail, renderCharacterSheet, renderSceneChunks, validateMp4 } from '../render/renderer';
+import { assembleFinal, ensureRenderBrowser, extractThumbnail, renderCharacterSheet, renderSceneChunks, validateMp4 } from '../render/renderer';
 import { buildScriptRequest, generateValidatedScript } from '../script/scriptEngine';
 import { generateValidatedStoryboard } from '../storyboard/storyboardEngine';
 import type { Studio } from '../studio';
@@ -395,6 +395,10 @@ export class GenerationPipeline {
     const eta = new EtaEstimator(plan.durationInFrames);
     let cachedScenes = 0;
     try {
+      if (!env.browserExecutable) {
+        // First render on a new machine downloads Remotion's headless Chrome (once).
+        await ensureRenderBrowser(null, (f) => s.report(0, `Downloading renderer browser (one-time)… ${Math.round(f * 100)}%`));
+      }
       s.report(0.0, 'Starting renderer…');
       const chunks = await renderSceneChunks(plan, s.paths.scenesDir, env, {
         signal: s.signal,
