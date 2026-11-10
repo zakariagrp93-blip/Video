@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import type { z } from 'zod';
-import { ProviderError } from '../../util/errors';
+import { ProviderError, TruncatedResponseError } from '../../util/errors';
 import { getFetchImplementation } from '../../util/http';
 import type { ConnectionTestResult, ProviderContext } from '../types';
 import { RemoteLLMProvider, type JsonRequest, type TextRequest } from './remoteLlm';
@@ -151,7 +151,8 @@ export class AnthropicLLMProvider extends RemoteLLMProvider {
         outputTokens: response.usage.output_tokens,
       });
       if (response.stop_reason === 'refusal') throw new ProviderError('anthropic', 'The model declined this request. Try rephrasing the topic.', undefined, false);
-      if (response.stop_reason === 'max_tokens') throw new ProviderError('anthropic', `Response for ${req.name} was truncated (max_tokens).`, undefined, true);
+      // Not retryable as-is: the same request would be cut off again. The caller asks for a shorter answer.
+      if (response.stop_reason === 'max_tokens') throw new TruncatedResponseError('anthropic', req.name, response.usage.output_tokens);
       return response.content.map((b) => (b.type === 'text' ? b.text : '')).join('');
     } catch (err) {
       throw this.mapError(err);
@@ -159,7 +160,7 @@ export class AnthropicLLMProvider extends RemoteLLMProvider {
   }
 
   private mapError(err: unknown): unknown {
-    if (err instanceof ProviderError) return err;
+    if (err instanceof ProviderError || err instanceof TruncatedResponseError) return err;
     if (err instanceof Anthropic.AuthenticationError) return new ProviderError('anthropic', 'Invalid API key.', 401, false);
     if (err instanceof Anthropic.RateLimitError) return new ProviderError('anthropic', 'Rate limited.', 429, true);
     if (err instanceof Anthropic.BadRequestError) return new ProviderError('anthropic', `Bad request: ${err.message}`, 400, false);

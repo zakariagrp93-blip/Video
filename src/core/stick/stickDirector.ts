@@ -4,7 +4,7 @@ import { checkStickCode } from '../../shared/stick';
 import { STICK_ENGINE_SOURCE, STICK_EXAMPLE_SHOTS } from '../../shared/stickEngine.generated';
 import type { ProviderContext, ScriptRequest } from '../providers/types';
 import type { TextRequest } from '../providers/llm/remoteLlm';
-import { throwIfAborted, UserFacingError } from '../util/errors';
+import { throwIfAborted, TruncatedResponseError, UserFacingError } from '../util/errors';
 
 /**
  * Stick-figure explainers (format of the claude-animation-skills /stick-figure skill, MIT):
@@ -51,7 +51,14 @@ export function stickStoryboard(script: Script): Storyboard {
     negative: s.negative,
     durationHint: s.durationHint,
     visualDescription: s.visual,
-    character: { visible: false, pose: 'idle', expression: 'neutral', position: 'center', motion: 'none', facing: 'right' },
+    character: {
+      visible: false,
+      pose: 'idle',
+      expression: 'neutral',
+      position: 'center',
+      motion: 'none',
+      facing: 'right',
+    },
     background: 'black',
     props: [],
     effect: 'none',
@@ -61,7 +68,14 @@ export function stickStoryboard(script: Script): Storyboard {
     chart: null,
     sfx: [],
   }));
-  return { version: 1, title: script.title, language: script.language, characterId: 'stick', scenes, illustrations: [] };
+  return {
+    version: 1,
+    title: script.title,
+    language: script.language,
+    characterId: 'stick',
+    scenes,
+    illustrations: [],
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -98,9 +112,19 @@ A complete example reel written for this engine (a pirate story; reuse its techn
 ${STICK_EXAMPLE_SHOTS}
 \`\`\``;
 
+const TOO_LONG =
+  'Your previous answer was far too long and was cut off before the end. Write a much shorter shot list: at most 300 lines in total, 8 to 12 shots, one small set of reusable helpers, no long comments, and do not think at length before writing.';
+
 export interface StickTiming {
   duration: number;
-  scenes: Array<{ index: number; start: number; end: number; narration: string; visual: string; words: Array<{ w: string; t: number }> }>;
+  scenes: Array<{
+    index: number;
+    start: number;
+    end: number;
+    narration: string;
+    visual: string;
+    words: Array<{ w: string; t: number }>;
+  }>;
 }
 
 export function stickTiming(scenes: PlannedScene[], narration: NarrationManifest, fps: number, durationInFrames: number, script: Script): StickTiming {
@@ -115,7 +139,12 @@ export function stickTiming(scenes: PlannedScene[], narration: NarrationManifest
         end: (sc.startFrame + sc.durationInFrames) / fps,
         narration: sc.narration,
         visual: script.scenes[i]?.visual ?? '',
-        words: seg ? seg.words.map((w) => ({ w: w.text, t: Math.round((seg.start + w.start) * 100) / 100 })) : [],
+        words: seg
+          ? seg.words.map((w) => ({
+              w: w.text,
+              t: Math.round((seg.start + w.start) * 100) / 100,
+            }))
+          : [],
       };
     }),
   };
@@ -123,7 +152,10 @@ export function stickTiming(scenes: PlannedScene[], narration: NarrationManifest
 
 export function stickShotsPrompt(script: Script, timing: StickTiming): string {
   const table = timing.scenes
-    .map((s) => `Scene ${s.index}  ${s.start.toFixed(2)}–${s.end.toFixed(2)} s\n  voice: ${s.narration}\n  shot idea: ${s.visual || '(free)'}\n  words: ${s.words.map((w) => `${w.w}@${w.t.toFixed(2)}`).join(' ')}`)
+    .map(
+      (s) =>
+        `Scene ${s.index}  ${s.start.toFixed(2)}–${s.end.toFixed(2)} s\n  voice: ${s.narration}\n  shot idea: ${s.visual || '(free)'}\n  words: ${s.words.map((w) => `${w.w}@${w.t.toFixed(2)}`).join(' ')}`,
+    )
     .join('\n');
   return [
     `Reel: "${script.title}" (${LANGUAGE_LABELS[script.language]} voiceover). DURATION = ${timing.duration.toFixed(2)} s.`,
@@ -168,13 +200,21 @@ export async function writeStickShots(script: Script, timing: StickTiming, deps:
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   };
   const onProgress: TextRequest['onProgress'] = (p) =>
-    deps.report(at, p.phase === 'writing' ? `${label}… ${p.chars.toLocaleString('fr-FR')} characters written (${clock()})` : p.phase === 'thinking' ? `${label}… thinking (${clock()})` : `${label}… connecting`);
+    deps.report(
+      at,
+      p.phase === 'writing' ? `${label}… ${p.chars.toLocaleString('fr-FR')} characters written (${clock()})` : p.phase === 'thinking' ? `${label}… thinking (${clock()})` : `${label}… connecting`,
+    );
   const phase = (l: string, a: number) => {
     label = l;
     at = a;
     t0 = Date.now();
   };
-  const base: TextRequest = { name: 'stick-shots', system: STICK_SHOTS_SYSTEM, prompt: stickShotsPrompt(script, timing), onProgress };
+  const base: TextRequest = {
+    name: 'stick-shots',
+    system: STICK_SHOTS_SYSTEM,
+    prompt: stickShotsPrompt(script, timing),
+    onProgress,
+  };
   let calls = 0;
   let rounds = 0;
   let working: string | null = null;
@@ -182,15 +222,27 @@ export async function writeStickShots(script: Script, timing: StickTiming, deps:
 
   phase('Claude is writing the animation', 0.05);
   deps.report(0.05, 'Claude is writing the animation (usually 3–10 minutes)…');
-  let text = await deps.writeText(base, ctx, true);
+  let feedback: string | null = null;
+  // A cut-off answer is not retried as-is (it would be cut off again): ask for a shorter one.
+  const ask = async (req: TextRequest, useCache: boolean): Promise<string> => {
+    try {
+      return await deps.writeText(req, ctx, useCache);
+    } catch (err) {
+      if (!(err instanceof TruncatedResponseError)) throw err;
+      deps.warn("Claude's first shot list was too long and was cut off; asking for a shorter one.");
+      return '';
+    }
+  };
+  let text = await ask(base, true);
   calls++;
   let code = extractCode(text);
-  let feedback: string | null = null;
+  if (!text) feedback = TOO_LONG;
   // Fix loop: static checks and render errors go back to the model with the code.
   while (calls <= maxCalls) {
     throwIfAborted(ctx.signal);
     rounds++;
-    if (!code) feedback = 'Your answer contained no ```js code block with SHOTS.push calls.';
+    if (!text) feedback = TOO_LONG;
+    else if (!code) feedback = 'Your answer contained no ```js code block with SHOTS.push calls.';
     else {
       const issues = checkStickCode(code);
       if (issues.length) feedback = issues.join(' ');
@@ -208,7 +260,15 @@ export async function writeStickShots(script: Script, timing: StickTiming, deps:
     if (calls >= maxCalls) break;
     phase('Claude is fixing the animation', 0.4 + 0.1 * rounds);
     deps.report(at, 'Claude is fixing the animation…');
-    text = await deps.writeText({ ...base, prompt: `${base.prompt}\n\nYour previous shot list:\n\`\`\`js\n${code ?? text.slice(0, 20000)}\n\`\`\`\n\nIt was rejected: ${feedback}\nReturn the complete corrected shot list as one \`\`\`js block.` }, ctx, false);
+    text = await ask(
+      text
+        ? {
+            ...base,
+            prompt: `${base.prompt}\n\nYour previous shot list:\n\`\`\`js\n${code ?? text.slice(0, 20000)}\n\`\`\`\n\nIt was rejected: ${feedback}\nReturn the complete corrected shot list as one \`\`\`js block.`,
+          }
+        : { ...base, prompt: `${base.prompt}\n\n${TOO_LONG}` },
+      false,
+    );
     calls++;
     code = extractCode(text);
   }
@@ -218,15 +278,22 @@ export async function writeStickShots(script: Script, timing: StickTiming, deps:
   if (calls < maxCalls) {
     phase('Claude is reviewing the frames', 0.7);
     deps.report(at, 'Claude is reviewing the frames…');
-    const review = await deps.writeText(
-      {
-        ...base,
-        prompt: `${base.prompt}\n\nYour shot list:\n\`\`\`js\n${working}\n\`\`\`\n\nThe image is a contact sheet of rendered frames, left to right, top to bottom, at t = ${sheet.times.map((t) => t.toFixed(1)).join(', ')} s (captions not shown; they sit at y≈1345). Check each frame against the voice at that time: empty or broken frames, figures cut off or outside the safe area, faces or key props inside the caption band y 1250–1420, unreadable labels, shots that don't show what is being said. If everything is fine, answer exactly OK. Otherwise return the complete corrected shot list as one \`\`\`js block.`,
-        images: [{ data: sheet.sheet, mediaType: 'image/jpeg' }],
-      },
-      ctx,
-      false,
-    );
+    let review = 'OK';
+    try {
+      review = await deps.writeText(
+        {
+          ...base,
+          prompt: `${base.prompt}\n\nYour shot list:\n\`\`\`js\n${working}\n\`\`\`\n\nThe image is a contact sheet of rendered frames, left to right, top to bottom, at t = ${sheet.times.map((t) => t.toFixed(1)).join(', ')} s (captions not shown; they sit at y≈1345). Check each frame against the voice at that time: empty or broken frames, figures cut off or outside the safe area, faces or key props inside the caption band y 1250–1420, unreadable labels, shots that don't show what is being said. If everything is fine, answer exactly OK. Otherwise return the complete corrected shot list as one \`\`\`js block.`,
+          images: [{ data: sheet.sheet, mediaType: 'image/jpeg' }],
+        },
+        ctx,
+        false,
+      );
+    } catch (err) {
+      // The review is a bonus: a failure here never discards the working animation.
+      if (ctx.signal?.aborted) throw err;
+      deps.warn(`Frame review skipped (${(err as Error).message.slice(0, 160)}).`);
+    }
     calls++;
     const fixed = /^\s*OK\s*\.?\s*$/i.test(review) ? null : extractCode(review);
     if (fixed && fixed !== working) {

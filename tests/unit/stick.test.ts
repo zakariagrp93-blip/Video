@@ -56,3 +56,34 @@ describe('stick-figure shot code', () => {
     expect(stickShotsPrompt(script, timing)).toContain('Scene 2  2.00–5.00 s');
   });
 });
+
+describe('stick shot writer', () => {
+  it('asks for a shorter shot list when the first answer is cut off, without re-sending the same request', async () => {
+    const { writeStickShots } = await import('../../src/core/stick/stickDirector');
+    const { TruncatedResponseError } = await import('../../src/core/util/errors');
+    const prompts: string[] = [];
+    const warnings: string[] = [];
+    let n = 0;
+    const res = await writeStickShots(
+      { title: 'T', language: 'fr', scenes: [{ visual: '' }] } as never,
+      { duration: 3, scenes: [{ index: 1, start: 0, end: 3, narration: 'Un.', visual: '', words: [] }] },
+      {
+        writeText: async (req) => {
+          prompts.push(req.prompt);
+          n++;
+          if (n === 1) throw new TruncatedResponseError('anthropic', 'stick-shots', 48000);
+          if (req.images) return 'OK';
+          return '```js\nSHOTS.push({ start: 0, end: DURATION, tr: "cut", draw(ctx) { drawSky(ctx); } });\n```';
+        },
+        test: async () => ({ sheet: Buffer.from('jpg'), times: [1] }),
+        report: () => {},
+        warn: (w) => warnings.push(w),
+      },
+      { signal: undefined } as never,
+    );
+    expect(res.code).toContain('drawSky');
+    expect(prompts[1]).toMatch(/cut off/);
+    expect(prompts[1]).toMatch(/at most 300 lines/);
+    expect(warnings.join()).toMatch(/too long/);
+  });
+});

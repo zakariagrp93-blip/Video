@@ -31,6 +31,18 @@ export class CancelledError extends Error {
   }
 }
 
+/** The model hit its output limit: retrying the same request would fail the same way. */
+export class TruncatedResponseError extends Error {
+  constructor(
+    public readonly provider: string,
+    public readonly request: string,
+    public readonly outputTokens: number,
+  ) {
+    super(`${provider}: the answer for ${request} was too long and was cut off (${outputTokens} output tokens).`);
+    this.name = 'TruncatedResponseError';
+  }
+}
+
 export class ProviderError extends Error {
   constructor(
     public readonly provider: string,
