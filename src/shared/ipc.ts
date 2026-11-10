@@ -118,6 +118,8 @@ export interface FvsApi {
   chooseFile(): Promise<string | null>;
   clearCache(): Promise<void>;
   systemInfo(): Promise<SystemInfoDTO>;
+  customIcons(): Promise<{ dir: string; found: string[]; expected: string[] }>;
+  openCustomIconsFolder(): Promise<void>;
   queueState(): Promise<{ running: string | null; queued: string[]; last: ProgressDTO[] }>;
   onProgress(cb: (e: ProgressDTO) => void): () => void;
   onVoiceDownload(cb: (e: { voiceId: string; fraction: number; done?: boolean; error?: string }) => void): () => void;

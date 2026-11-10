@@ -8,7 +8,9 @@ import { parseSettingsPatch } from '../src/core/settings/settingsStore';
 import { projectPaths } from '../src/core/projects/projectStore';
 import { PiperTTSProvider } from '../src/core/providers/tts/piper/piperTts';
 import type { Studio } from '../src/core/studio';
-import { exists, sanitizeFileName } from '../src/core/util/fsx';
+import { ensureDir, exists, sanitizeFileName } from '../src/core/util/fsx';
+import { scanCustomIcons } from '../src/core/characters/customIcons';
+import { PROP_ASSETS } from '../src/shared/constants';
 
 /** Host-specific operations (dialogs, shell) injected by the Electron main process. */
 export interface HostServices {
@@ -188,6 +190,19 @@ export function createHandlers(studio: Studio, host: HostServices): Omit<FvsApi,
         dataDir: studio.paths.dataDir,
         secureStorage: host.secureStorage,
       };
+    },
+    async customIcons() {
+      const dir = studio.settings.get().customIconsDir;
+      return { dir, found: Object.keys(scanCustomIcons(dir)), expected: [...PROP_ASSETS] };
+    },
+    async openCustomIconsFolder() {
+      let dir = studio.settings.get().customIconsDir;
+      if (!dir) {
+        dir = path.join(studio.paths.dataDir, 'my-icons');
+        await studio.settings.update({ customIconsDir: dir });
+      }
+      await ensureDir(dir);
+      await host.openPath(dir);
     },
     async queueState() {
       return studio.queue.snapshot();

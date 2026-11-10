@@ -254,6 +254,13 @@ export const VideoPlanSchema = z.object({
   theme: ThemeSchema,
   brandName: z.string().optional(),
   characterId: z.string(),
+  /** 'cinema' = wide illustration band + title banner + sentence captions; 'tall' = full frame. */
+  layout: z.enum(['cinema', 'tall']).default('tall'),
+  captionMode: z.enum(['sentence', 'karaoke']).default('karaoke'),
+  /** Persistent title banner (the video's hook question) in the cinematic layout. */
+  banner: z.string().max(140).optional(),
+  /** Colour treatment applied to object illustrations. */
+  iconTone: z.enum(['color', 'muted', 'mono']).default('color'),
   scenes: z.array(PlannedSceneSchema).min(1),
   captions: z.array(CaptionCueSchema),
   /** imageKey -> URL reachable by the renderer (local asset server). */
@@ -326,6 +333,10 @@ export const SettingsSchema = z.object({
   llmModel: z.object({ anthropic: z.string(), openai: z.string() }).default({ anthropic: 'claude-opus-5-5', openai: 'gpt-5' }),
   imageProvider: z.enum(IMAGE_PROVIDERS).default('vector'),
   imageModel: z.string().default('gpt-image-1'),
+  /** Folder with the user's own icons named after assets (house.svg, phone.png…); they replace built-in ones. */
+  customIconsDir: z.string().default(''),
+  /** Colour treatment of object illustrations: full colour, muted (closer to cinematic finance stories) or monochrome. */
+  iconTone: z.enum(['color', 'muted', 'mono']).default('mono'),
   /** Max AI illustrations per video (cost guard). Vector assets are unlimited. */
   maxAiImagesPerVideo: z.number().int().min(0).max(8).default(2),
   ttsProvider: z.enum(TTS_PROVIDERS).default('piper'),

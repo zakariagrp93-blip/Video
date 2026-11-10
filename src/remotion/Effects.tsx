@@ -5,17 +5,17 @@ import { IconContent } from './props/icons';
 
 const clamp = { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' } as const;
 
-const MoneyRain: React.FC<{ frame: number; accent: string }> = ({ frame, accent }) => {
+const MoneyRain: React.FC<{ frame: number; accent: string; width: number; height: number }> = ({ frame, accent, width, height }) => {
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
       {Array.from({ length: 22 }, (_, i) => {
         const delay = random(`md${i}`) * 40;
-        const speed = 14 + random(`ms${i}`) * 10;
+        const speed = (14 + random(`ms${i}`) * 10) * Math.max(0.5, height / 1920);
         const f = frame - delay;
         if (f < 0) return null;
         const y = -160 + f * speed;
-        if (y > 2000) return null;
-        const x = random(`mx${i}`) * 1080 + Math.sin(f / 9 + i) * 40;
+        if (y > height + 100) return null;
+        const x = random(`mx${i}`) * width + Math.sin(f / 9 + i) * 40;
         const rot = Math.sin(f / 7 + i) * 50;
         const size = 90 + random(`mz${i}`) * 60;
         const isCoin = i % 4 === 0;
@@ -52,11 +52,11 @@ const CoinBurst: React.FC<{ frame: number; accent: string; cx: number; cy: numbe
   );
 };
 
-const Sparkles: React.FC<{ frame: number; accent: string; cx: number }> = ({ frame, accent, cx }) => (
+const Sparkles: React.FC<{ frame: number; accent: string; cx: number; cy: number }> = ({ frame, accent, cx, cy }) => (
   <AbsoluteFill style={{ pointerEvents: 'none' }}>
     {Array.from({ length: 12 }, (_, i) => {
       const x = cx + (random(`spx${i}`) - 0.5) * 760;
-      const y = 600 + random(`spy${i}`) * 700;
+      const y = cy - 420 + random(`spy${i}`) * 700;
       const phase = random(`spp${i}`) * 40;
       const s = Math.max(0, Math.sin(((frame + phase) / 26) * Math.PI));
       const size = 30 + random(`sps${i}`) * 34;
@@ -69,13 +69,13 @@ const Sparkles: React.FC<{ frame: number; accent: string; cx: number }> = ({ fra
   </AbsoluteFill>
 );
 
-const Impact: React.FC<{ frame: number; cx: number; cy: number }> = ({ frame, cx, cy }) => {
+const Impact: React.FC<{ frame: number; cx: number; cy: number; width: number; height: number }> = ({ frame, cx, cy, width, height }) => {
   const flash = interpolate(frame, [0, 2, 8], [0, 0.35, 0], clamp);
   const p = interpolate(frame, [0, 14], [0, 1], clamp);
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
       <AbsoluteFill style={{ background: '#fff', opacity: flash }} />
-      <svg width={1080} height={1920} style={{ position: 'absolute', inset: 0 }}>
+      <svg width={width} height={height} style={{ position: 'absolute', inset: 0 }}>
         {Array.from({ length: 14 }, (_, i) => {
           const a = (i / 14) * Math.PI * 2;
           const r1 = 220 + p * 160;
@@ -87,7 +87,7 @@ const Impact: React.FC<{ frame: number; cx: number; cy: number }> = ({ frame, cx
   );
 };
 
-const Confetti: React.FC<{ frame: number; accent: string }> = ({ frame, accent }) => {
+const Confetti: React.FC<{ frame: number; accent: string; cx: number; cy: number }> = ({ frame, accent, cx, cy }) => {
   const colors = [accent, '#FF453A', '#32D74B', '#0A84FF', '#FFFFFF'];
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
@@ -95,53 +95,53 @@ const Confetti: React.FC<{ frame: number; accent: string }> = ({ frame, accent }
         const delay = random(`cd${i}`) * 10;
         const f = frame - delay;
         if (f < 0) return null;
-        const x = 540 + (random(`cx${i}`) - 0.5) * 300 + (random(`cvx${i}`) - 0.5) * f * 26;
-        const y = 900 - f * (20 + random(`cvy${i}`) * 14) + 0.75 * f * f;
+        const x = cx + (random(`cx${i}`) - 0.5) * 300 + (random(`cvx${i}`) - 0.5) * f * 26;
+        const y = cy - f * (20 + random(`cvy${i}`) * 14) + 0.75 * f * f;
         return <div key={i} style={{ position: 'absolute', left: x, top: y, width: 18, height: 30, background: colors[i % colors.length], transform: `rotate(${f * 14 + i * 20}deg) scaleX(${Math.cos(f / 3 + i)})`, borderRadius: 3 }} />;
       })}
     </AbsoluteFill>
   );
 };
 
-const Smoke: React.FC<{ frame: number; cx: number }> = ({ frame, cx }) => (
+const Smoke: React.FC<{ frame: number; cx: number; baseY: number }> = ({ frame, cx, baseY }) => (
   <AbsoluteFill style={{ pointerEvents: 'none' }}>
     {Array.from({ length: 10 }, (_, i) => {
       const f = (frame + i * 9) % 90;
       const x = cx + (random(`smx${i}`) - 0.5) * 300 + Math.sin(f / 15) * 30;
-      const y = 1250 - f * 6;
+      const y = baseY - f * 6;
       const size = 80 + f * 2.5;
       return <div key={i} style={{ position: 'absolute', left: x - size / 2, top: y - size / 2, width: size, height: size, borderRadius: '50%', background: 'rgba(160,160,170,0.18)', opacity: interpolate(f, [0, 15, 90], [0, 0.6, 0], clamp), filter: 'blur(6px)' }} />;
     })}
   </AbsoluteFill>
 );
 
-const SpeedLines: React.FC<{ frame: number }> = ({ frame }) => (
+const SpeedLines: React.FC<{ frame: number; width: number; height: number }> = ({ frame, width, height }) => (
   <AbsoluteFill style={{ pointerEvents: 'none' }}>
     {Array.from({ length: 16 }, (_, i) => {
-      const y = 500 + random(`sly${i}`) * 900;
+      const y = height * 0.25 + random(`sly${i}`) * height * 0.5;
       const len = 200 + random(`sll${i}`) * 300;
-      const x = 1200 - ((frame * 48 + random(`slx${i}`) * 1400) % 1800);
+      const x = width + 120 - ((frame * 48 + random(`slx${i}`) * (width + 300)) % (width + 700));
       return <div key={i} style={{ position: 'absolute', left: x, top: y, width: len, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.35)' }} />;
     })}
   </AbsoluteFill>
 );
 
-export const EffectLayer: React.FC<{ effect: Effect; frame: number; accent: string; cx: number; cy: number }> = ({ effect, frame, accent, cx, cy }) => {
+export const EffectLayer: React.FC<{ effect: Effect; frame: number; accent: string; cx: number; cy: number; width?: number; height?: number }> = ({ effect, frame, accent, cx, cy, width = 1080, height = 1920 }) => {
   switch (effect) {
     case 'money-rain':
-      return <MoneyRain frame={frame} accent={accent} />;
+      return <MoneyRain frame={frame} accent={accent} width={width} height={height} />;
     case 'coin-burst':
       return <CoinBurst frame={frame} accent={accent} cx={cx} cy={cy} />;
     case 'sparkles':
-      return <Sparkles frame={frame} accent={accent} cx={cx} />;
+      return <Sparkles frame={frame} accent={accent} cx={cx} cy={cy} />;
     case 'impact':
-      return <Impact frame={frame} cx={cx} cy={cy} />;
+      return <Impact frame={frame} cx={cx} cy={cy} width={width} height={height} />;
     case 'confetti':
-      return <Confetti frame={frame} accent={accent} />;
+      return <Confetti frame={frame} accent={accent} cx={cx} cy={cy} />;
     case 'smoke':
-      return <Smoke frame={frame} cx={cx} />;
+      return <Smoke frame={frame} cx={cx} baseY={cy + 300} />;
     case 'speed-lines':
-      return <SpeedLines frame={frame} />;
+      return <SpeedLines frame={frame} width={width} height={height} />;
     default:
       return null;
   }

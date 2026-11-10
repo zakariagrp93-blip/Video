@@ -30,6 +30,8 @@ const METHODS: FvsMethod[] = [
   'chooseFile',
   'clearCache',
   'systemInfo',
+  'customIcons',
+  'openCustomIconsFolder',
   'queueState',
 ];
 

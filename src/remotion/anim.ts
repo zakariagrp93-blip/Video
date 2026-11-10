@@ -169,7 +169,7 @@ export function characterMotion(motion: CharacterMotion, frame: number, duration
 }
 
 /** Entrance/exit styling for scene transitions (self-contained, so scenes can render independently). */
-export function transitionStyle(kind: Transition, frame: number, duration: number, nextKind: Transition | null): { opacity: number; transform: string; clipPath?: string } {
+export function transitionStyle(kind: Transition, frame: number, duration: number, nextKind: Transition | null, width = 1080, height = 1920): { opacity: number; transform: string; clipPath?: string } {
   const IN = 9;
   const OUT = 7;
   let opacity = 1;
@@ -183,10 +183,10 @@ export function transitionStyle(kind: Transition, frame: number, duration: numbe
       opacity = pin;
       break;
     case 'slide-left':
-      x = 1080 * (1 - pin);
+      x = width * (1 - pin);
       break;
     case 'slide-up':
-      y = 1920 * (1 - pin) * 0.6;
+      y = height * (1 - pin) * 0.6;
       opacity = Math.min(1, pin * 1.5);
       break;
     case 'zoom-through':
@@ -207,10 +207,10 @@ export function transitionStyle(kind: Transition, frame: number, duration: numbe
         opacity *= 1 - pout;
         break;
       case 'slide-left':
-        x -= 1080 * pout;
+        x -= width * pout;
         break;
       case 'slide-up':
-        y -= 600 * pout;
+        y -= height * 0.31 * pout;
         opacity *= 1 - pout;
         break;
       case 'zoom-through':

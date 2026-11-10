@@ -83,6 +83,18 @@ export function SettingsScreen() {
               </Field>
             </>
           )}
+          <Field label="Icon style" hint="White & grey matches cinematic finance stories: everyday objects in white/grey, money and signals keep their colour.">
+            <Select
+              value={s.iconTone}
+              onChange={(v) => save({ iconTone: v })}
+              options={[
+                { value: 'mono', label: 'White & grey (cinematic)' },
+                { value: 'muted', label: 'Muted colours' },
+                { value: 'color', label: 'Full colour' },
+              ]}
+            />
+          </Field>
+          <CustomIconsField dir={s.customIconsDir} onChoose={(d) => save({ customIconsDir: d })} />
           <Field label="Voice (TTS)" hint={s.ttsProvider === 'piper' ? 'Local neural voices, offline after a one-time download. Subtitles are aligned on detected pauses.' : s.ttsProvider === 'elevenlabs' ? 'Returns character timestamps for exact subtitle timing.' : 'No timestamps; subtitles aligned on detected pauses.'}>
             <Select
               value={s.ttsProvider}
@@ -244,6 +256,39 @@ export function SettingsScreen() {
         </Card>
       )}
     </div>
+  );
+}
+
+function CustomIconsField({ dir, onChoose }: { dir: string; onChoose: (d: string) => void }) {
+  const [info, setInfo] = useState<{ found: string[]; expected: string[] } | null>(null);
+  useEffect(() => {
+    void api().customIcons().then(setInfo);
+  }, [dir]);
+  return (
+    <Field
+      label="My icons (optional)"
+      hint={
+        <>
+          Put your own icons (SVG/PNG, e.g. licensed from Flaticon or The Noun Project) in a folder, named after the object: <span className="mono">house.svg</span>, <span className="mono">phone.png</span>… They replace the built-in ones.
+          {info && (
+            <>
+              {' '}
+              {dir ? `${info.found.length} icon(s) detected${info.found.length ? `: ${info.found.join(', ')}` : ''}.` : 'No folder selected.'}
+              <details>
+                <summary>Accepted names</summary>
+                <span className="mono small">{info.expected.join(', ')}</span>
+              </details>
+            </>
+          )}
+        </>
+      }
+    >
+      <div className="row gap-8 wrap">
+        <Button onClick={async () => { const f = await api().chooseFolder(); if (f) onChoose(f); }}>Choose folder…</Button>
+        <Button variant="ghost" onClick={async () => { await api().openCustomIconsFolder(); setInfo(await api().customIcons()); }}>Open folder</Button>
+        {dir && <Button variant="ghost" onClick={() => onChoose('')}>Clear</Button>}
+      </div>
+    </Field>
   );
 }
 

@@ -6,6 +6,10 @@ export interface CaptionOptions {
   maxCharsPerCue: number;
   minCueSeconds: number;
   holdSeconds: number;
+  /** Punctuation that always ends a cue. */
+  breakAfter?: RegExp;
+  /** Max silence (s) inside a cue before it is split. */
+  maxGap?: number;
 }
 
 export const DEFAULT_CAPTION_OPTIONS: CaptionOptions = {
@@ -14,6 +18,17 @@ export const DEFAULT_CAPTION_OPTIONS: CaptionOptions = {
   maxCharsPerCue: 18,
   minCueSeconds: 0.4,
   holdSeconds: 0.25,
+};
+
+/** Short sentence captions under the illustration (cinematic layout). */
+export const SENTENCE_CAPTION_OPTIONS: CaptionOptions = {
+  fps: 30,
+  maxWordsPerCue: 11,
+  maxCharsPerCue: 64,
+  minCueSeconds: 0.8,
+  holdSeconds: 0.35,
+  breakAfter: /[.!?…:]$/,
+  maxGap: 1.2,
 };
 
 export function normalizeWord(w: string): string {
@@ -64,11 +79,11 @@ export function buildCaptions(words: TimedWord[], scenes: PlannedScene[], opts: 
   for (const w of words) {
     const prev = cur[cur.length - 1];
     const chars = cur.reduce((a, x) => a + x.text.length + 1, 0) + w.text.length;
-    if (prev && (prev.sceneIndex !== w.sceneIndex || cur.length >= opts.maxWordsPerCue || chars > opts.maxCharsPerCue || w.start - prev.end > 0.6)) {
+    if (prev && (prev.sceneIndex !== w.sceneIndex || cur.length >= opts.maxWordsPerCue || chars > opts.maxCharsPerCue || w.start - prev.end > (opts.maxGap ?? 0.6))) {
       flush();
     }
     cur.push(w);
-    if (/[.!?…,;:]$/.test(w.text)) flush();
+    if ((opts.breakAfter ?? /[.!?…,;:]$/).test(w.text)) flush();
   }
   flush();
 

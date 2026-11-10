@@ -20,6 +20,7 @@ import { mixAudio } from '../audio/mixer';
 import { generateMusic, seedFrom } from '../audio/synth';
 import { encodeWav } from '../audio/wav';
 import { exportVectorIllustrations } from '../characters/characterLibrary';
+import { importCustomIcons } from '../characters/customIcons';
 import { projectPaths, type ProjectPaths } from '../projects/projectStore';
 import type { ProviderContext } from '../providers/types';
 import { startAssetServer } from '../render/assetServer';
@@ -27,7 +28,7 @@ import { assembleFinal, ensureRenderBrowser, extractThumbnail, renderCharacterSh
 import { buildScriptRequest, generateValidatedScript } from '../script/scriptEngine';
 import { generateValidatedStoryboard } from '../storyboard/storyboardEngine';
 import type { Studio } from '../studio';
-import { absoluteWords, buildCaptions, toSrt, validateCaptions } from '../subtitles/subtitleEngine';
+import { DEFAULT_CAPTION_OPTIONS, SENTENCE_CAPTION_OPTIONS, absoluteWords, buildCaptions, toSrt, validateCaptions } from '../subtitles/subtitleEngine';
 import { buildAudioPlan, buildVideoPlan, planScenes } from '../timing/timeline';
 import { CancelledError, StageError, UserFacingError, errorMessage, isRetryable, throwIfAborted } from '../util/errors';
 import { ensureDir, exists, readJson, safeJoin, sanitizeFileName, writeFileAtomic, writeJson } from '../util/fsx';
@@ -295,9 +296,13 @@ export class GenerationPipeline {
         }
       }
     }
+    // The user's own icon pack (e.g. icons they licensed from Flaticon / Noun Project).
+    const custom = await importCustomIcons(settings.customIconsDir, sb, s.paths.illustrationsDir);
+    Object.assign(images, custom.images);
+    custom.warnings.forEach(s.warn);
     if (sb.illustrations.length > requests.length) s.warn(`${sb.illustrations.length - requests.length} AI illustration request(s) skipped by the per-video limit; vector assets used.`);
     await writeJson(path.join(s.paths.illustrationsDir, 'manifest.json'), { provider: provider.id, vectors, images, characters: chars });
-    return `${chars.length} character poses, ${vectors.length} vector assets, ${Object.keys(images).length} AI illustrations`;
+    return `${chars.length} character poses, ${vectors.length} vector assets, ${Object.keys(custom.images).length} custom icons, ${Object.keys(images).length - Object.keys(custom.images).length} AI illustrations`;
   }
 
   private async stageVoice(s: StageContext): Promise<string> {
@@ -330,7 +335,16 @@ export class GenerationPipeline {
     s.report(0.1, 'Synchronising scene timing to the narration…');
     const { scenes, durationInFrames } = planScenes(sb, narration, VIDEO_FPS);
     const brand = s.project.options.visualStyle === 'custom-brand' ? settings.brand : null;
-    const draft = buildVideoPlan(sb, narration, [], { brand, images: {} });
+    const cinematic = s.project.options.visualStyle !== 'full-frame';
+    const script = ScriptSchema.parse(await readJson(s.paths.scriptJson));
+    const draft = buildVideoPlan(sb, narration, [], {
+      brand,
+      images: {},
+      layout: cinematic ? 'cinema' : 'tall',
+      captionMode: cinematic ? 'sentence' : 'karaoke',
+      banner: cinematic ? script.title : undefined,
+      iconTone: settings.iconTone,
+    });
     await writeJson(path.join(s.paths.renderDir, 'timeline.draft.json'), draft);
 
     s.report(0.3, 'Composing music…');
@@ -368,7 +382,7 @@ export class GenerationPipeline {
     const narration = NarrationManifestSchema.parse(await readJson(path.join(s.paths.audioDir, 'narration.json')));
     s.report(0.2, 'Aligning subtitles to the voice…');
     const words = absoluteWords(narration, draft.scenes.map((x) => x.id));
-    const captions = buildCaptions(words, draft.scenes);
+    const captions = buildCaptions(words, draft.scenes, draft.captionMode === 'sentence' ? SENTENCE_CAPTION_OPTIONS : DEFAULT_CAPTION_OPTIONS);
     const issues = validateCaptions(captions, draft.durationInFrames);
     if (issues.length) throw new StageError('subtitles', `Subtitle timing invalid: ${issues.slice(0, 3).join('; ')}`, false);
     await writeJson(path.join(s.paths.subtitlesDir, 'captions.json'), captions);

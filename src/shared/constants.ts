@@ -35,12 +35,13 @@ export const STORYTELLING_LABELS: Record<StorytellingStyle, string> = {
   unexpected: 'Unexpected scenario',
 };
 
-export const VISUAL_STYLES = ['minimal-finance', 'custom-brand'] as const;
+export const VISUAL_STYLES = ['minimal-finance', 'custom-brand', 'full-frame'] as const;
 export type VisualStyle = (typeof VISUAL_STYLES)[number];
 
 export const VISUAL_STYLE_LABELS: Record<VisualStyle, string> = {
-  'minimal-finance': 'Minimal finance (Finance Lite inspired)',
-  'custom-brand': 'Custom brand style',
+  'minimal-finance': 'Finance Lite inspired (cinematic band)',
+  'custom-brand': 'Custom brand style (cinematic band)',
+  'full-frame': 'Full-frame (big mascot, karaoke captions)',
 };
 
 /** Mascot poses. Each one is a distinct, hand-built skeleton in the Mascot component. */

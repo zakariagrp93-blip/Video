@@ -3,6 +3,10 @@ import type { AudioPlan, NarrationManifest, PlannedScene, SfxEvent, Storyboard, 
 
 export interface TimelineOptions {
   fps?: number;
+  layout?: 'cinema' | 'tall';
+  captionMode?: 'sentence' | 'karaoke';
+  banner?: string;
+  iconTone?: 'color' | 'muted' | 'mono';
   brand?: { name: string; accent: string; danger: string } | null;
   images?: Record<string, string>;
 }
@@ -53,6 +57,10 @@ export function buildVideoPlan(storyboard: Storyboard, narration: NarrationManif
     theme,
     brandName: opts.brand?.name || undefined,
     characterId: storyboard.characterId,
+    layout: opts.layout ?? 'tall',
+    captionMode: opts.captionMode ?? 'karaoke',
+    banner: opts.banner ? opts.banner.slice(0, 140) : undefined,
+    iconTone: opts.iconTone ?? 'color',
     scenes,
     captions,
     images: opts.images ?? {},

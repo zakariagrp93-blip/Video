@@ -19,7 +19,7 @@ const EXPR: Record<string, Expression> = {
 };
 
 /** Demo plan showing every pose with props — used as Remotion Studio default props and in render tests. */
-export function samplePlan(scenesCount: number = POSES.length, sceneSeconds = 2): VideoPlan {
+export function samplePlan(scenesCount: number = POSES.length, sceneSeconds = 2, layout: 'tall' | 'cinema' = 'tall'): VideoPlan {
   const dur = Math.round(sceneSeconds * VIDEO_FPS);
   const scenes: PlannedScene[] = POSES.slice(0, scenesCount).map((pose, i) => ({
     id: `s${String(i + 1).padStart(2, '0')}`,
@@ -51,6 +51,10 @@ export function samplePlan(scenesCount: number = POSES.length, sceneSeconds = 2)
     durationInFrames: scenes.length * dur,
     theme: DEFAULT_THEME,
     characterId: 'nummo',
+    layout,
+    captionMode: layout === 'cinema' ? 'sentence' : 'karaoke',
+    iconTone: 'color',
+    banner: layout === 'cinema' ? 'Et si tu recevais 1 million d’euros à 18 ans ?' : undefined,
     scenes,
     captions: scenes.map((s) => ({ startFrame: s.startFrame + 5, endFrame: s.startFrame + s.durationInFrames - 5, words: [{ text: s.character.pose, startFrame: s.startFrame + 5, endFrame: s.startFrame + 30, tone: 'accent' as const }] })),
     images: {},
