@@ -11,6 +11,10 @@ Type a topic → click **GENERATE VIDEO** → get a validated MP4. You never edi
 
 The default setup runs **fully offline at zero API cost**: a built-in story engine, local neural voices (Piper), a vector illustration library and procedurally generated music. Cloud providers (Anthropic Claude, OpenAI, ElevenLabs) are optional and interchangeable.
 
+![Dashboard](samples/ui-dashboard.png)
+
+**Reference test video:** [`samples/test-video-1-million-18-ans.mp4`](samples/test-video-1-million-18-ans.mp4). It was generated fully automatically from *"What if you received €1 million at age 18?"*: French, 60.5 s, original mascot, Piper narration, animated subtitles, music and SFX. [Contact sheet](samples/test-video-contact-sheet.png).
+
 ---
 
 ## Contents
