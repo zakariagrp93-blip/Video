@@ -1,0 +1,9 @@
+{
+  "_comment": "Chosen illustration per asset: a = Fluent 3D, b = Fluent Flat, c = Noto, d = Fluent high contrast, keep = hand-drawn. Picked by the user in the icon picker on 2026-11-10.",
+  "bank": "c", "banknote": "c", "briefcase": "c", "building": "c", "calendar": "c", "car": "c",
+  "chart-down": "c", "chart-up": "c", "clock": "c", "coffee": "c", "coin": "c", "coin-stack": "c",
+  "credit-card": "c", "diploma": "c", "exclamation": "c", "gift": "c", "graduation-cap": "c", "hourglass": "c",
+  "house": "c", "laptop": "c", "lock": "c", "mansion": "c", "money-bag": "c", "money-stack": "c",
+  "percent-badge": "c", "phone": "c", "piggy-bank": "c", "plane": "c", "question-mark": "c", "receipt": "c",
+  "shop": "c", "shopping-bag": "c", "sports-car": "c", "trophy": "c", "wallet": "c", "yacht": "c"
+}
