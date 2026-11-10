@@ -3,7 +3,7 @@ import type { Language } from '../../shared/constants';
 import type { NarrationManifest, NarrationSegment, Storyboard, WordTiming } from '../../shared/schemas';
 import type { ProviderContext, TTSProvider, VoiceInfo } from '../providers/types';
 import { alignUtterance } from '../subtitles/align';
-import { displayTokens, normalizeForSpeech, sentenceProsody, splitSentences } from '../text/speech';
+import { applyPronunciations, displayTokens, normalizeForSpeech, sentenceProsody, splitSentences } from '../text/speech';
 import { throwIfAborted } from '../util/errors';
 import { ensureDir, safeJoin } from '../util/fsx';
 import { resample, writeWav } from './wav';
@@ -33,6 +33,8 @@ export interface NarrationBuildInput {
   audioDir: string;
   ctx: ProviderContext;
   onScene?: (index: number, total: number) => void;
+  /** Pronunciation fixes for the spoken text (Settings → Pronunciation). */
+  pronunciations?: Array<{ word: string; say: string }>;
   /** Pauses (s); motivation edits breathe more between lines. */
   gaps?: { lead: number; sentence: number; scene: number; tail: number };
 }
@@ -63,7 +65,7 @@ export async function buildNarration(input: NarrationBuildInput): Promise<Narrat
     const methods = new Set<string>();
     for (let s = 0; s < sentences.length; s++) {
       const sentence = sentences[s]!;
-      const spoken = normalizeForSpeech(sentence, language);
+      const spoken = applyPronunciations(normalizeForSpeech(sentence, language), input.pronunciations ?? [], tts.id === 'fishaudio');
       if (!/[\p{L}\p{N}]/u.test(spoken)) continue;
       const prosody = sentenceProsody(sentence);
       const res = await tts.synthesize({ text: spoken, language, voiceId: voice.id, speed: Math.round(speed * prosody.speed * 100) / 100 }, ctx);

@@ -35,6 +35,8 @@ export function estimateCost(rec: UsageRecord, pricing: Settings['pricing']): nu
       return pricing.openaiImagePerImage ? rec.units * pricing.openaiImagePerImage : null;
     case 'openai:tts':
       return pricing.openaiTtsPerMChar ? (rec.units * pricing.openaiTtsPerMChar) / 1e6 : null;
+    case 'fishaudio:tts':
+      return pricing.fishaudioPerMChar ? (rec.units * pricing.fishaudioPerMChar) / 1e6 : rec.model === 's2.1-pro-free' ? 0 : null;
     case 'elevenlabs:tts':
       return pricing.elevenlabsPerMChar ? (rec.units * pricing.elevenlabsPerMChar) / 1e6 : null;
     default:

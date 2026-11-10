@@ -5,6 +5,7 @@ import { AnthropicLLMProvider } from './llm/anthropicLlm';
 import { OfflineLLMProvider } from './llm/offline/offlineLlm';
 import { OpenAILLMProvider } from './llm/openaiLlm';
 import { ElevenLabsTTSProvider } from './tts/elevenlabsTts';
+import { FishAudioTTSProvider } from './tts/fishAudioTts';
 import { OpenAITTSProvider } from './tts/openaiTts';
 import { PiperTTSProvider } from './tts/piper/piperTts';
 import type { ImageProvider, LLMProvider, TTSProvider } from './types';
@@ -35,6 +36,7 @@ export class ProviderRegistry {
     this.tts = {
       piper: new PiperTTSProvider(voicesDir, () => this.settings().voices.piper),
       elevenlabs: new ElevenLabsTTSProvider(() => secrets.get('elevenlabsApiKey'), () => this.settings().elevenlabsModel, () => this.settings().voices.elevenlabs),
+      fishaudio: new FishAudioTTSProvider(() => secrets.get('fishaudioApiKey'), () => this.settings().fishaudioModel, () => this.settings().voices.fishaudio),
       openai: new OpenAITTSProvider(() => secrets.get('openaiApiKey'), () => this.settings().openaiTtsModel, () => this.settings().voices.openai),
     };
   }

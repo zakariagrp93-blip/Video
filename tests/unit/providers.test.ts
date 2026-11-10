@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { AnthropicLLMProvider } from '../../src/core/providers/llm/anthropicLlm';
 import { OpenAILLMProvider } from '../../src/core/providers/llm/openaiLlm';
 import { ElevenLabsTTSProvider, supportsLanguageCode, wordsFromCharAlignment } from '../../src/core/providers/tts/elevenlabsTts';
+import { FISH_DEFAULT_VOICE, FishAudioTTSProvider } from '../../src/core/providers/tts/fishAudioTts';
 import { OpenAITTSProvider } from '../../src/core/providers/tts/openaiTts';
 import { OfflineLLMProvider } from '../../src/core/providers/llm/offline/offlineLlm';
 import { buildScriptRequest } from '../../src/core/script/scriptEngine';
@@ -203,5 +204,58 @@ describe('ElevenLabs provider', () => {
     const { ctx } = await testContext();
     const p = new ElevenLabsTTSProvider(() => 'xi-test-key-1234567890', () => 'eleven_multilingual_v2', () => ({ male: 'm', female: 'f' }));
     await expect(p.synthesize({ text: 'x', language: 'fr', voiceId: 'f', speed: 1 }, ctx)).rejects.toMatchObject({ retryable: true, status: 429 });
+  });
+});
+
+describe('Fish Audio provider', () => {
+  const make = (model = 's2.1-pro-free') => new FishAudioTTSProvider(() => 'sk-fish-test-1234567890', () => model, () => ({ male: FISH_DEFAULT_VOICE, female: '' }));
+
+  it('posts to /v1/tts with the model header and reference_id, and decodes raw PCM', async () => {
+    const pcm = Buffer.alloc(44100 * 2);
+    for (let i = 0; i < 44100; i++) pcm.writeInt16LE(Math.round(Math.sin(i / 9) * 9000), i * 2);
+    mockFetch(() => ({ body: pcm, type: 'audio/pcm' }));
+    const { ctx, usage } = await testContext();
+    const p = make();
+    const voice = await p.resolveVoice('fr', 'auto');
+    expect(voice.id).toBe('536d3a5e000945adb7038665781a4aca');
+    const r = await p.synthesize({ text: 'Salut, ça va ?', language: 'fr', voiceId: voice.id, speed: 1.1 }, ctx);
+    expect(captured[0]!.url).toBe('https://api.fish.audio/v1/tts');
+    expect(captured[0]!.init.headers.get('authorization')).toBe('Bearer sk-fish-test-1234567890');
+    expect(captured[0]!.init.headers.get('model')).toBe('s2.1-pro-free');
+    const body = JSON.parse(String(captured[0]!.init.body));
+    expect(body).toMatchObject({ text: 'Salut, ça va ?', reference_id: voice.id, format: 'pcm', sample_rate: 44100, prosody: { speed: 1.1 } });
+    expect(r.sampleRate).toBe(44100);
+    expect(r.samples.length).toBe(44100);
+    expect(r.alignment).toBe('none');
+    expect(usage).toHaveLength(1);
+    const again = await p.synthesize({ text: 'Salut, ça va ?', language: 'fr', voiceId: voice.id, speed: 1.1 }, ctx);
+    expect(again.cached).toBe(true);
+    expect(captured).toHaveLength(1);
+  });
+
+  it('explains a rejected key and missing credit, without retrying', async () => {
+    const { ctx } = await testContext();
+    mockFetch(() => ({ status: 401, json: { message: 'invalid' } }));
+    await expect(make().synthesize({ text: 'x', language: 'fr', voiceId: 'v', speed: 1 }, ctx)).rejects.toMatchObject({ retryable: false, message: expect.stringContaining('API key') });
+    mockFetch(() => ({ status: 402, json: { message: 'credit' } }));
+    await expect(make('s2-pro').synthesize({ text: 'y', language: 'fr', voiceId: 'v', speed: 1 }, ctx)).rejects.toMatchObject({ retryable: false, message: expect.stringContaining('s2.1-pro-free') });
+    mockFetch(() => ({ status: 503, json: {} }));
+    await expect(make().synthesize({ text: 'z', language: 'fr', voiceId: 'v', speed: 1 }, ctx)).rejects.toMatchObject({ retryable: true });
+  });
+
+  it('lists the account voices first, then library voices in the language', async () => {
+    mockFetch((url) => ({ json: { items: url.includes('self=true') ? [{ _id: 'mine1', title: 'Ma voix' }] : [{ _id: 'lib1', title: 'Narrateur', tags: ['male'], author: { nickname: 'bob' } }, { _id: 'mine1', title: 'dup' }] } }));
+    const voices = await make().listVoices('fr');
+    expect(voices.map((v) => [v.id, v.category])).toEqual([
+      ['mine1', 'yours'],
+      ['lib1', 'library'],
+    ]);
+    expect(voices[1]!.gender).toBe('male');
+    expect(captured.some((c) => c.url.includes('language=fr'))).toBe(true);
+  });
+
+  it('requires a key and a voice', () => {
+    expect(new FishAudioTTSProvider(() => undefined, () => 's1', () => ({ male: 'a', female: '' })).checkReady()).toMatch(/API key/);
+    expect(new FishAudioTTSProvider(() => 'k', () => 's1', () => ({ male: '', female: '' })).checkReady()).toMatch(/voice/);
   });
 });

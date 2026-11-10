@@ -73,3 +73,16 @@ describe('tokenization', () => {
     expect(numberSyllables(3750, 'fr')).toBeGreaterThanOrEqual(5);
   });
 });
+
+describe('pronunciation dictionary', () => {
+  it('replaces whole words in the spoken text, case-insensitively', async () => {
+    const { applyPronunciations } = await import('../../src/core/text/speech');
+    expect(applyPronunciations('Les ETF, les etf et les ETFs.', [{ word: 'ETF', say: 'é-té-èf' }], false)).toBe('Les é-té-èf, les é-té-èf et les ETFs.');
+  });
+  it('uses phoneme tags only for engines that understand them', async () => {
+    const { applyPronunciations } = await import('../../src/core/text/speech');
+    const e = [{ word: 'Kubernetes', say: '<|phoneme_start|>K UW2 B ER0 N EH1 T IY0 Z<|phoneme_end|>' }];
+    expect(applyPronunciations('Kubernetes.', e, true)).toBe('<|phoneme_start|>K UW2 B ER0 N EH1 T IY0 Z<|phoneme_end|>.');
+    expect(applyPronunciations('Kubernetes.', e, false)).toBe('Kubernetes.');
+  });
+});

@@ -339,8 +339,8 @@ export type Project = z.infer<typeof ProjectSchema>;
 
 export const LLM_PROVIDERS = ['offline', 'anthropic', 'openai'] as const;
 export const IMAGE_PROVIDERS = ['vector', 'openai'] as const;
-export const TTS_PROVIDERS = ['piper', 'elevenlabs', 'openai'] as const;
-export const SECRET_KEYS = ['anthropicApiKey', 'openaiApiKey', 'elevenlabsApiKey'] as const;
+export const TTS_PROVIDERS = ['piper', 'elevenlabs', 'openai', 'fishaudio'] as const;
+export const SECRET_KEYS = ['anthropicApiKey', 'openaiApiKey', 'elevenlabsApiKey', 'fishaudioApiKey'] as const;
 export type SecretKey = (typeof SECRET_KEYS)[number];
 
 export const SettingsSchema = z.object({
@@ -359,10 +359,19 @@ export const SettingsSchema = z.object({
     .object({
       piper: z.record(z.string(), z.string()).default({}),
       elevenlabs: z.object({ male: z.string(), female: z.string() }).default({ male: '', female: '' }),
+      fishaudio: z.object({ male: z.string(), female: z.string() }).default({ male: '536d3a5e000945adb7038665781a4aca', female: '' }),
       openai: z.object({ male: z.string(), female: z.string() }).default({ male: 'onyx', female: 'nova' }),
     })
-    .default({ piper: {}, elevenlabs: { male: '', female: '' }, openai: { male: 'onyx', female: 'nova' } }),
+    .default({ piper: {}, elevenlabs: { male: '', female: '' }, openai: { male: 'onyx', female: 'nova' }, fishaudio: { male: '536d3a5e000945adb7038665781a4aca', female: '' } }),
   elevenlabsModel: z.string().default('eleven_multilingual_v2'),
+  /** Fish Audio model header: "s2.1-pro-free" is free until 30 Nov 2026 (no SLA; requests may be used to improve the model). */
+  fishaudioModel: z.string().default('s2.1-pro-free'),
+  /**
+   * Pronunciation fixes applied to the spoken text only (subtitles keep the written word).
+   * "say" is plain text ("é-té-èf") or, for Fish Audio, CMU Arpabet phoneme tags
+   * (<|phoneme_start|>K UW2 B ER0 N EH1 T IY0 Z<|phoneme_end|>).
+   */
+  pronunciations: z.array(z.object({ word: z.string().trim().min(1).max(60), say: z.string().trim().min(1).max(200) })).max(200).default([]),
   openaiTtsModel: z.string().default('gpt-4o-mini-tts'),
   speakingSpeed: z.number().min(0.7).max(1.4).default(1.0),
   defaultDuration: z.enum(DURATION_OPTIONS).default('60'),
@@ -392,6 +401,7 @@ export const SettingsSchema = z.object({
       openaiImagePerImage: z.number().min(0),
       openaiTtsPerMChar: z.number().min(0),
       elevenlabsPerMChar: z.number().min(0),
+      fishaudioPerMChar: z.number().min(0).default(0),
     })
     .default({
       anthropicInputPerMTok: 4,
@@ -401,6 +411,7 @@ export const SettingsSchema = z.object({
       openaiImagePerImage: 0,
       openaiTtsPerMChar: 0,
       elevenlabsPerMChar: 0,
+      fishaudioPerMChar: 0,
     }),
 });
 export type Settings = z.infer<typeof SettingsSchema>;

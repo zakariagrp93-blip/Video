@@ -134,6 +134,23 @@ export function normalizeForSpeech(text: string, lang: Language): string {
   return t;
 }
 
+export const PHONEME_TAG = /<\|phoneme_start\|>[^<]*<\|phoneme_end\|>/;
+
+/**
+ * Apply the user's pronunciation dictionary to already-normalised spoken text. Whole words
+ * only, case-insensitive. Entries written with phoneme tags are only used when the engine
+ * understands them (Fish Audio); other engines would read the tags aloud.
+ */
+export function applyPronunciations(text: string, entries: Array<{ word: string; say: string }>, phonemeTags: boolean): string {
+  let t = text;
+  for (const e of [...entries].sort((a, b) => b.word.length - a.word.length)) {
+    if (!e.word.trim() || (!phonemeTags && PHONEME_TAG.test(e.say))) continue;
+    const esc = e.word.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    t = t.replace(new RegExp(`(?<![\\p{L}\\p{N}])${esc}(?![\\p{L}\\p{N}])`, 'giu'), () => e.say);
+  }
+  return t;
+}
+
 /**
  * Split display text into subtitle tokens. Number groups and their unit
  * ("1 000 000 €", "5 %") stay together as one token.

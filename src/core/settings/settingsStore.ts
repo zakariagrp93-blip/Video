@@ -94,6 +94,7 @@ export class SecretStore {
       anthropicApiKey: process.env.FVS_ANTHROPIC_API_KEY,
       openaiApiKey: process.env.FVS_OPENAI_API_KEY,
       elevenlabsApiKey: process.env.FVS_ELEVENLABS_API_KEY,
+      fishaudioApiKey: process.env.FVS_FISHAUDIO_API_KEY,
     };
     for (const key of SECRET_KEYS) {
       const v = envMap[key];

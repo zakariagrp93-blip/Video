@@ -95,13 +95,14 @@ export function SettingsScreen() {
             />
           </Field>
           <CustomIconsField dir={s.customIconsDir} onChoose={(d) => save({ customIconsDir: d })} />
-          <Field label="Voice (TTS)" hint={s.ttsProvider === 'piper' ? 'Local neural voices, offline after a one-time download. Subtitles are aligned on detected pauses.' : s.ttsProvider === 'elevenlabs' ? 'Returns character timestamps for exact subtitle timing.' : 'No timestamps; subtitles aligned on detected pauses.'}>
+          <Field label="Voice (TTS)" hint={s.ttsProvider === 'piper' ? 'Local neural voices, offline after a one-time download. Subtitles are aligned on detected pauses.' : s.ttsProvider === 'elevenlabs' ? 'Returns character timestamps for exact subtitle timing.' : s.ttsProvider === 'fishaudio' ? 'Expressive cloud voices (model S2.1). No timestamps; subtitles aligned on detected pauses.' : 'No timestamps; subtitles aligned on detected pauses.'}>
             <Select
               value={s.ttsProvider}
               onChange={(v) => save({ ttsProvider: v })}
               options={[
                 { value: 'piper', label: 'Piper — local neural voices (free)' },
                 { value: 'elevenlabs', label: 'ElevenLabs' },
+                { value: 'fishaudio', label: 'Fish Audio' },
                 { value: 'openai', label: 'OpenAI TTS' },
               ]}
             />
@@ -118,12 +119,14 @@ export function SettingsScreen() {
       </Card>
 
       <VoicesCard s={s} save={save} />
+      <PronunciationCard s={s} save={save} />
 
       <Card title="API keys">
         <p className="muted small">Keys are encrypted with the operating system's secure storage{info && !info.secureStorage ? ' (unavailable on this system — keys cannot be saved)' : ''}. They never reach the interface or the logs.</p>
         <SecretRow label="Anthropic API key" k="anthropicApiKey" set={secrets.anthropicApiKey} onChange={setSecrets} />
         <SecretRow label="OpenAI API key" k="openaiApiKey" set={secrets.openaiApiKey} onChange={setSecrets} />
         <SecretRow label="ElevenLabs API key" k="elevenlabsApiKey" set={secrets.elevenlabsApiKey} onChange={setSecrets} />
+        <SecretRow label="Fish Audio API key" k="fishaudioApiKey" set={secrets.fishaudioApiKey} onChange={setSecrets} />
       </Card>
 
       <Card title="Defaults & export">
@@ -226,6 +229,7 @@ export function SettingsScreen() {
               ['openaiImagePerImage', 'OpenAI per image'],
               ['openaiTtsPerMChar', 'OpenAI TTS / 1M characters'],
               ['elevenlabsPerMChar', 'ElevenLabs / 1M characters'],
+              ['fishaudioPerMChar', 'Fish Audio / 1M characters'],
             ] as const
           ).map(([k, label]) => (
             <Field key={k} label={label}>
@@ -394,6 +398,113 @@ function TestButton({ kind, id }: { kind: 'llm' | 'image' | 'tts'; id: string })
   );
 }
 
+const VOICE_TAG: Record<string, string> = { premade: ' · free', cloned: ' · yours', generated: ' · yours', yours: ' · yours', library: ' · library' };
+
+/** Voice pickers for cloud TTS (ElevenLabs, Fish Audio): load the account's voices, or type an ID. */
+function CloudVoices({ provider, s, save, lang, voices, setVoices, note }: { provider: 'elevenlabs' | 'fishaudio'; s: Settings; save: (p: Partial<Settings>) => Promise<void>; lang: Language; voices: VoiceDTO[]; setVoices: (v: VoiceDTO[]) => void; note: string }) {
+  const toast = useToast();
+  const cfg = s.voices[provider];
+  return (
+    <>
+      <div className="row gap-8 mb-12 wrap">
+        <Button
+          size="sm"
+          onClick={() =>
+            void api()
+              .listVoices(provider, lang)
+              .then((v) => {
+                setVoices(v);
+                toast(v.length ? 'success' : 'error', v.length ? `${v.length} voices loaded.` : 'No voices returned — check your API key.');
+              })
+              .catch((err) => toast('error', errorText(err)))
+          }
+        >
+          Load my voices
+        </Button>
+        <span className="small muted">{note}</span>
+      </div>
+      <div className="form-grid">
+        {(['male', 'female'] as const).map((g) => {
+          const current = cfg[g];
+          const set = (v: string) => save({ voices: { ...s.voices, [provider]: { ...cfg, [g]: v } } });
+          const free = (v: VoiceDTO) => v.category === 'premade' || v.category === 'yours';
+          return (
+            <Field key={g} label={`${g === 'male' ? 'Male' : 'Female'} voice`}>
+              {voices.length > 0 ? (
+                <Select
+                  value={current}
+                  onChange={set}
+                  options={[
+                    { value: '', label: '— none —' },
+                    ...(current && !voices.some((v) => v.id === current) ? [{ value: current, label: `${current} (typed ID)` }] : []),
+                    ...[...voices]
+                      .sort((a, b) => Number(free(b)) - Number(free(a)) || a.label.localeCompare(b.label))
+                      .map((v) => ({ value: v.id, label: `${v.label}${v.gender !== 'unspecified' ? ` · ${v.gender}` : ''}${v.category ? (VOICE_TAG[v.category] ?? ` · ${v.category}`) : ''}` })),
+                  ]}
+                />
+              ) : (
+                <TextInput value={current} onCommit={set} />
+              )}
+            </Field>
+          );
+        })}
+        <Field label="Model" hint={provider === 'fishaudio' ? 's2.1-pro-free is free until 30 Nov 2026 (no SLA; requests may be used to improve the model). Paid: s2-pro, s1.' : undefined}>
+          {provider === 'fishaudio' ? (
+            <TextInput value={s.fishaudioModel} onCommit={(v) => save({ fishaudioModel: v })} />
+          ) : (
+            <TextInput value={s.elevenlabsModel} onCommit={(v) => save({ elevenlabsModel: v })} />
+          )}
+        </Field>
+      </div>
+    </>
+  );
+}
+
+/** Words the narrator mispronounces → how to say them. Applied to the audio only. */
+function PronunciationCard({ s, save }: { s: Settings; save: (p: Partial<Settings>) => Promise<void> }) {
+  const [word, setWord] = useState('');
+  const [say, setSay] = useState('');
+  const list = s.pronunciations;
+  const add = () => {
+    if (!word.trim() || !say.trim()) return;
+    void save({ pronunciations: [...list.filter((e) => e.word.toLowerCase() !== word.trim().toLowerCase()), { word: word.trim(), say: say.trim() }] });
+    setWord('');
+    setSay('');
+  };
+  return (
+    <Card title="Pronunciation">
+      <p className="muted small">
+        Fix how the narrator says a word; subtitles keep the written word. Write it the way it sounds (“ETF” → “é-té-èf”). With Fish Audio you can also use CMU Arpabet phoneme tags, e.g.
+        <code> &lt;|phoneme_start|&gt;K UW2 B ER0 N EH1 T IY0 Z&lt;|phoneme_end|&gt;</code> for “Kubernetes” (other voices skip tagged entries).
+      </p>
+      <div className="row gap-8 wrap mb-12">
+        <input className="input" placeholder="Word (e.g. ETF)" value={word} maxLength={60} onChange={(e) => setWord(e.target.value)} />
+        <input className="input grow" placeholder="Say as (e.g. é-té-èf)" value={say} maxLength={200} onChange={(e) => setSay(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
+        <Button size="sm" onClick={add} disabled={!word.trim() || !say.trim()}>
+          Add
+        </Button>
+      </div>
+      {list.length > 0 && (
+        <table className="table">
+          <tbody>
+            {list.map((e) => (
+              <tr key={e.word}>
+                <td>{e.word}</td>
+                <td className="muted small">{e.say}</td>
+                <td className="right">
+                  <Button size="sm" onClick={() => void save({ pronunciations: list.filter((x) => x !== e) })}>
+                    Remove
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </Card>
+  );
+}
+
 function VoicesCard({ s, save }: { s: Settings; save: (p: Partial<Settings>) => Promise<void> }) {
   const [lang, setLang] = useState<Language>(s.defaultLanguage);
   const [voices, setVoices] = useState<VoiceDTO[]>([]);
@@ -464,54 +575,20 @@ function VoicesCard({ s, save }: { s: Settings; save: (p: Partial<Settings>) => 
           </table>
         </>
       )}
-      {s.ttsProvider === 'elevenlabs' && (
-        <>
-          <div className="row gap-8 mb-12">
-            <Button
-              size="sm"
-              onClick={() =>
-                void api()
-                  .listVoices('elevenlabs', lang)
-                  .then((v) => {
-                    setVoices(v);
-                    toast(v.length ? 'success' : 'error', v.length ? `${v.length} voices loaded.` : 'No voices returned — check your API key.');
-                  })
-                  .catch((err) => toast('error', errorText(err)))
-              }
-            >
-              Load my voices
-            </Button>
-            <span className="small muted">Free plans can only use voices marked “free” (premade) or voices you created.</span>
-          </div>
-          <div className="form-grid">
-            {(['male', 'female'] as const).map((g) => {
-              const current = s.voices.elevenlabs[g];
-              const set = (v: string) => save({ voices: { ...s.voices, elevenlabs: { ...s.voices.elevenlabs, [g]: v } } });
-              return (
-                <Field key={g} label={`${g === 'male' ? 'Male' : 'Female'} voice`}>
-                  {voices.length > 0 ? (
-                    <Select
-                      value={current}
-                      onChange={set}
-                      options={[
-                        { value: '', label: '— none —' },
-                        ...(current && !voices.some((v) => v.id === current) ? [{ value: current, label: `${current} (not in your account)` }] : []),
-                        ...[...voices]
-                          .sort((a, b) => Number(b.category === 'premade') - Number(a.category === 'premade') || a.label.localeCompare(b.label))
-                          .map((v) => ({ value: v.id, label: `${v.label}${v.gender !== 'unspecified' ? ` · ${v.gender}` : ''}${v.category === 'premade' ? ' · free' : v.category === 'cloned' || v.category === 'generated' ? ' · yours' : v.category ? ` · ${v.category}` : ''}` })),
-                      ]}
-                    />
-                  ) : (
-                    <TextInput value={current} onCommit={set} />
-                  )}
-                </Field>
-              );
-            })}
-            <Field label="Model">
-              <TextInput value={s.elevenlabsModel} onCommit={(v) => save({ elevenlabsModel: v })} />
-            </Field>
-          </div>
-        </>
+      {(s.ttsProvider === 'elevenlabs' || s.ttsProvider === 'fishaudio') && (
+        <CloudVoices
+          provider={s.ttsProvider}
+          s={s}
+          save={save}
+          lang={lang}
+          voices={voices}
+          setVoices={setVoices}
+          note={
+            s.ttsProvider === 'elevenlabs'
+              ? 'Free plans can only use voices marked “free” (premade) or voices you created.'
+              : 'Your own voices, then popular voices of the library in this language. You can also paste any voice ID from a fish.audio voice page.'
+          }
+        />
       )}
       {s.ttsProvider === 'openai' && (
         <div className="form-grid">

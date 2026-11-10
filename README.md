@@ -137,6 +137,9 @@ All providers implement interfaces from `src/core/providers/types.ts` and are se
 | TTS | **Piper** (default) | Local neural voices run with ONNX Runtime in Node; phonemes come from eSpeak-NG (WASM). Voices: FR female and male, EN female and male, ES ×2, DE female and male. Offline after a one-time download. |
 | TTS | **ElevenLabs** | `/with-timestamps` endpoint for character-accurate subtitle timing. |
 | TTS | **OpenAI TTS** | WAV output; subtitles use pause-anchored alignment. |
+| TTS | **Fish Audio** | `POST https://api.fish.audio/v1/tts` with the `model` header (default `s2.1-pro-free`, free until 30 Nov 2026 — no SLA, requests may be used to improve the model; paid: `s2-pro`, `s1`) and the voice as `reference_id`. Raw PCM 44.1 kHz; *Load my voices* lists your voices and popular library voices in the video's language. Key: Settings → API keys (encrypted). |
+
+**Pronunciation dictionary** (Settings → Pronunciation): word → how to say it, applied to the spoken text only. With Fish Audio an entry can use CMU Arpabet phoneme tags (`<|phoneme_start|>K UW2 B ER0 N EH1 T IY0 Z<|phoneme_end|>`); other engines skip tagged entries.
 
 The LLM provider has three jobs: generating scripts, generating storyboards, and validating scene data. A script is accepted only after schema and content validation: length target, hook, no generic filler, no unsourced "facts", language check. Invalid output is regenerated with the validation errors as feedback, up to a bounded number of attempts. Storyboards also pass through deterministic continuity repairs (no overlap between props and the character, one prop per slot, camera variety). If a remote LLM keeps failing, the rule-based director builds the storyboard instead.
 

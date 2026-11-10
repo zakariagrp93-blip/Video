@@ -338,6 +338,7 @@ export class GenerationPipeline {
       language: s.project.options.language,
       speed: settings.speakingSpeed * (edit ? EDIT_SPEED : 1),
       gaps: edit ? EDIT_GAPS : undefined,
+      pronunciations: settings.pronunciations,
       audioDir: s.paths.audioDir,
       ctx: s.ctx,
       onScene: (i, n) => s.report(0.2 + (0.8 * i) / n, `Narrating scene ${i + 1}/${n} (${voice.label})`, { scene: { index: i, total: n } }),
