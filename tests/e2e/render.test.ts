@@ -19,6 +19,14 @@ function brightFraction(file: string): number {
   return bright / (img.width * img.height);
 }
 
+/** Share of pixels that are not near-black (the shot itself is drawn, not an empty frame). */
+function litFraction(file: string): number {
+  const img = decodePng(fs.readFileSync(file));
+  let lit = 0;
+  for (let i = 0; i < img.pixels.length; i += 4) if (img.pixels[i]! + img.pixels[i + 1]! + img.pixels[i + 2]! > 60) lit++;
+  return lit / (img.width * img.height);
+}
+
 describe('scene composition and rendering', () => {
   it('composes a scene with the mascot and props (not a blank frame)', async () => {
     const out = path.join(dir, 'still.png');
@@ -34,8 +42,10 @@ describe('scene composition and rendering', () => {
       const out = path.join(dir, `edit-${sc.id}.png`);
       await renderStillFrame(plan, sc.startFrame + 40, out, { serveUrl, browserExecutable });
       const f = brightFraction(out);
-      expect(f, `${sc.motif}`).toBeGreaterThan(0.004); // big white words on a dark shot
+      // Big white/gold words on a dark, lit shot: some bright pixels, a clearly non-black frame.
+      expect(f, `${sc.motif}`).toBeGreaterThan(0.001);
       expect(f, `${sc.motif}`).toBeLessThan(0.35);
+      expect(litFraction(out), `${sc.motif}`).toBeGreaterThan(0.03);
     }
   });
 

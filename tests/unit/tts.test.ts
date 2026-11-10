@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PiperTTSProvider } from '../../src/core/providers/tts/piper/piperTts';
+import { PIPER_VOICES } from '../../src/core/providers/tts/piper/voices';
 import { alignUtterance, detectSilences } from '../../src/core/subtitles/align';
 import { displayTokens, normalizeForSpeech } from '../../src/core/text/speech';
 import { TEST_VOICES_DIR, testContext } from '../helpers';
@@ -11,6 +12,17 @@ describe('Piper TTS (local neural voice)', () => {
     expect((await tts.resolveVoice('fr', 'female')).id).toBe('fr-siwis-medium');
     expect((await tts.resolveVoice('fr', 'male')).id).toBe('fr-gilles-low');
     expect((await tts.resolveVoice('de', 'female')).id).toBe('de-ramona-low');
+  });
+
+  it('keeps commas only between long phrases (short ones flow without a pause)', async () => {
+    const { ctx } = await testContext('tts-comma');
+    const voice = await tts.resolveVoice('fr', 'female');
+    await tts.prepareVoice(voice, ctx);
+    const config = (await (tts as unknown as { loadVoice(v: unknown): Promise<{ config: Parameters<PiperTTSProvider['textToIds']>[1] }> }).loadVoice(PIPER_VOICES.find((v) => v.id === voice.id))).config;
+    const comma = config.phoneme_id_map[',']![0]!;
+    const count = async (t: string) => (await tts.textToIds(t, config)).filter((id) => id === comma).length;
+    expect(await count('Un million, à 18 ans, c’est énorme.')).toBe(0);
+    expect(await count('Si tu places tout cet argent aujourd’hui, tu deviens millionnaire avant tes trente ans.')).toBe(1);
   });
 
   it('synthesizes French speech with a realistic duration and caches it', async () => {

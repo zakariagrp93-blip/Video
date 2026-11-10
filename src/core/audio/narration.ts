@@ -3,7 +3,7 @@ import type { Language } from '../../shared/constants';
 import type { NarrationManifest, NarrationSegment, Storyboard, WordTiming } from '../../shared/schemas';
 import type { ProviderContext, TTSProvider, VoiceInfo } from '../providers/types';
 import { alignUtterance } from '../subtitles/align';
-import { displayTokens, normalizeForSpeech, splitSentences } from '../text/speech';
+import { displayTokens, normalizeForSpeech, sentenceProsody, splitSentences } from '../text/speech';
 import { throwIfAborted } from '../util/errors';
 import { ensureDir, safeJoin } from '../util/fsx';
 import { resample, writeWav } from './wav';
@@ -65,7 +65,8 @@ export async function buildNarration(input: NarrationBuildInput): Promise<Narrat
       const sentence = sentences[s]!;
       const spoken = normalizeForSpeech(sentence, language);
       if (!/[\p{L}\p{N}]/u.test(spoken)) continue;
-      const res = await tts.synthesize({ text: spoken, language, voiceId: voice.id, speed }, ctx);
+      const prosody = sentenceProsody(sentence);
+      const res = await tts.synthesize({ text: spoken, language, voiceId: voice.id, speed: Math.round(speed * prosody.speed * 100) / 100 }, ctx);
       const mono = resample(res.samples, res.sampleRate, NARRATION_SR);
       const [a, b] = trimBounds(mono, NARRATION_SR);
       const clip = mono.slice(a, b);
@@ -80,8 +81,9 @@ export async function buildNarration(input: NarrationBuildInput): Promise<Narrat
       parts.push(clip);
       cursor += clip.length / NARRATION_SR;
       if (s < sentences.length - 1) {
-        parts.push(new Float32Array(Math.round(gaps.sentence * NARRATION_SR)));
-        cursor += gaps.sentence;
+        const gap = gaps.sentence * prosody.pause;
+        parts.push(new Float32Array(Math.round(gap * NARRATION_SR)));
+        cursor += gap;
       }
     }
     if (parts.length === 0) throw new Error(`Scene ${scene.id} has no speakable narration.`);

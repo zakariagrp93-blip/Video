@@ -7,7 +7,7 @@ import { pipeline } from 'node:stream/promises';
 import * as tar from 'tar';
 import type { Language, NarratorOption } from '../../../../shared/constants';
 import { decodeWav, encodeWav } from '../../../audio/wav';
-import { splitClauses } from '../../../text/speech';
+import { splitClauses, wordCount } from '../../../text/speech';
 import { ProviderError, throwIfAborted } from '../../../util/errors';
 import { ensureDir, exists, safeJoin } from '../../../util/fsx';
 import { hashOf } from '../../../util/hash';
@@ -31,7 +31,13 @@ interface LoadedVoice {
   session: import('onnxruntime-node').InferenceSession;
 }
 
-const ENGINE_VERSION = 'piper-js-1';
+const ENGINE_VERSION = 'piper-js-2';
+
+/**
+ * A little more variation than the voices' defaults (0.667 / 0.8): livelier pitch and
+ * rhythm for storytelling, still well inside the range the models were trained with.
+ */
+export const EXPRESSIVE = { noise: 1.1, noiseW: 1.15 };
 
 /**
  * Local neural TTS: Piper voice models executed with ONNX Runtime, phonemes from
@@ -146,7 +152,10 @@ export class PiperTTSProvider implements TTSProvider {
       const c = clauses[i]!;
       const phonemes = await phonemizeClause(c.text, config.espeak.voice);
       const last = i === clauses.length - 1;
-      const punct = (c.punct || (last ? '.' : ',')).replace('…', '.').slice(0, 1);
+      let punct = (c.punct || (last ? '.' : ',')).replace('…', '.').slice(0, 1);
+      // Piper turns every comma into a pause with a falling pitch, which sounds read rather
+      // than told. Keep it only between two long phrases; short phrases flow together.
+      if (punct === ',' && !last && (wordCount(c.text) <= 3 || wordCount(clauses[i + 1]!.text) <= 3)) punct = '';
       const seq = `${phonemes}${punct}${last ? '' : ' '}`;
       for (const ch of [...seq]) {
         const id = map[ch];
@@ -178,7 +187,7 @@ export class PiperTTSProvider implements TTSProvider {
     const feeds: Record<string, import('onnxruntime-node').Tensor> = {
       input: new ort.Tensor('int64', BigInt64Array.from(ids.map(BigInt)), [1, ids.length]),
       input_lengths: new ort.Tensor('int64', BigInt64Array.from([BigInt(ids.length)]), [1]),
-      scales: new ort.Tensor('float32', Float32Array.from([config.inference.noise_scale, lengthScale, config.inference.noise_w]), [3]),
+      scales: new ort.Tensor('float32', Float32Array.from([config.inference.noise_scale * EXPRESSIVE.noise, lengthScale, Math.min(1.1, config.inference.noise_w * EXPRESSIVE.noiseW)]), [3]),
     };
     if (session.inputNames.includes('sid')) feeds.sid = new ort.Tensor('int64', BigInt64Array.from([0n]), [1]);
     const out = await session.run(feeds);

@@ -99,7 +99,7 @@ export class ElevenLabsTTSProvider implements TTSProvider {
 
   async synthesize(req: SynthesisRequest, ctx: ProviderContext): Promise<SynthesisResult> {
     const model = this.model();
-    const key = hashOf({ p: 'elevenlabs', m: model, v: req.voiceId, t: req.text, s: req.speed, l: req.language }, 32);
+    const key = hashOf({ p: 'elevenlabs', vs: 2, m: model, v: req.voiceId, t: req.text, s: req.speed, l: req.language }, 32);
     const cachedWav = await ctx.cache.get('tts', key, 'wav');
     const cachedMeta = await ctx.cache.getText('tts', `${key}m`);
     if (cachedWav && cachedMeta) {
@@ -116,7 +116,8 @@ export class ElevenLabsTTSProvider implements TTSProvider {
         model_id: model,
         // Only the Turbo/Flash v2.5 models accept an explicit language code.
         ...(supportsLanguageCode(model) ? { language_code: req.language } : {}),
-        voice_settings: { stability: 0.5, similarity_boost: 0.75, speed: Math.min(1.2, Math.max(0.7, req.speed)) },
+        // Lower stability + some style = a livelier, less "read" delivery.
+        voice_settings: { stability: 0.38, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true, speed: Math.min(1.2, Math.max(0.7, req.speed)) },
       }),
     });
     if (!res.ok) {

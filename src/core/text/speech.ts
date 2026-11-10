@@ -45,11 +45,61 @@ function joinThousands(text: string, lang: Language): string {
  * engine pronounces correctly ("3750 euros par mois", "1 million d'euros", "5 pour cent").
  * Subtitles keep the display form; only the audio uses this.
  */
+const BIG_WORDS: Record<Language, { million: [string, string]; billion: [string, string]; thousand: string }> = {
+  fr: { million: ['million', 'millions'], billion: ['milliard', 'milliards'], thousand: 'mille' },
+  en: { million: ['million', 'million'], billion: ['billion', 'billion'], thousand: 'thousand' },
+  es: { million: ['millón', 'millones'], billion: ['mil millones', 'mil millones'], thousand: 'mil' },
+  de: { million: ['Million', 'Millionen'], billion: ['Milliarde', 'Milliarden'], thousand: 'tausend' },
+};
+
+const num = (s: string) => Number(s.replace(',', '.'));
+/** Decimal as the language writes it ("1,5" / "1.5"), without a trailing ",0". */
+const decimalText = (v: number, lang: Language) => {
+  const r = Math.round(v * 100) / 100;
+  const t = Number.isInteger(r) ? String(r) : String(r);
+  return lang === 'en' ? t : t.replace('.', ',');
+};
+
+/**
+ * Expand amount shorthand that TTS engines misread ("93k€" → "quatre-vingt-treize ka euros"):
+ * k / K (thousand), M / Mio (million), Md / Mrd / bn / B (billion), with or without currency.
+ */
+function expandShorthand(text: string, lang: Language): string {
+  const SCALE = '(k|K|M|Mio|Md|Mds|Mrd|bn|B)';
+  const CUR = '(€|\\$|£|EUR|USD|GBP)';
+  const big = (amount: string, scale: string): { digits?: string; word?: string; plural: boolean } => {
+    const v = num(amount);
+    if (/^[kK]$/.test(scale)) return { digits: String(Math.round(v * 1000)), plural: true };
+    const w = /^(M|Mio)$/.test(scale) ? BIG_WORDS[lang].million : BIG_WORDS[lang].billion;
+    return { word: `${decimalText(v, lang)} ${v >= 2 ? w[1] : w[0]}`, plural: true };
+  };
+  const withCurrency = (amount: string, scale: string, sym: string) => {
+    const b = big(amount, scale);
+    return b.digits ? `${b.digits} ${sym}` : `${b.word} ${sym}`;
+  };
+  // €93k, $1.5M
+  let t = text.replace(new RegExp(`${CUR}\\s?(\\d+(?:[.,]\\d+)?)\\s?${SCALE}(?![\\p{L}])`, 'gu'), (_m, sym: string, a: string, sc: string) => withCurrency(a, sc, sym));
+  // 93k€, 93 k€, 1,5 M€, 2 Md€
+  t = t.replace(new RegExp(`(\\d+(?:[.,]\\d+)?)\\s?${SCALE}\\s?${CUR}`, 'g'), (_m, a: string, sc: string, sym: string) => withCurrency(a, sc, sym));
+  // 93k euros, 93k (no currency)
+  t = t.replace(/(\d+(?:[.,]\d+)?)\s?([kK])(?![\p{L}\d])/gu, (_m, a: string) => String(Math.round(num(a) * 1000)));
+  t = t.replace(/(\d+(?:[.,]\d+)?)\s?(M|Mio|Md|Mds|Mrd|bn)(?![\p{L}\d])/gu, (_m, a: string, sc: string) => big(a, sc).word!);
+  return t;
+}
+
 export function normalizeForSpeech(text: string, lang: Language): string {
-  let t = joinThousands(text, lang);
+  let t = expandShorthand(joinThousands(text, lang), lang);
   const words = CURRENCY_WORDS[lang];
   const unit = (kind: 'eur' | 'usd' | 'gbp', amount: string, big?: string) => {
-    const plural = big ? true : Number(amount.replace(',', '.')) !== 1;
+    // Round millions read as words: "1000000 €" → "1 million d'euros", "2500000 €" → "2,5 millions d'euros".
+    const v = num(amount);
+    if (!big && v >= 1e6 && Number.isInteger(v) && v % 1e5 === 0) {
+      const billions = v >= 1e9 && v % 1e8 === 0;
+      const x = billions ? v / 1e9 : v / 1e6;
+      const w = billions ? BIG_WORDS[lang].billion : BIG_WORDS[lang].million;
+      return unit(kind, decimalText(x, lang), x >= 2 ? w[1] : w[0]);
+    }
+    const plural = big ? true : num(amount) !== 1;
     const w = words[kind][plural ? 1 : 0];
     if (big) {
       if (lang === 'fr') return `${amount} ${big} ${/^[aeiouy]/i.test(w) ? 'd’' : 'de '}${w}`.replace('d’ ', 'd’');
@@ -132,6 +182,28 @@ export function splitClauses(text: string): Clause[] {
   }
   if (buf.trim()) out.push({ text: buf.trim(), punct: '' });
   return out;
+}
+
+/**
+ * Storytelling rhythm per sentence: short punchlines land slower, long explanations move
+ * faster, questions and "…" get a longer beat after them. Factors multiply the narrator's
+ * speed and the base pause after the sentence.
+ */
+export function sentenceProsody(sentence: string): { speed: number; pause: number } {
+  const s = sentence.trim();
+  const n = wordCount(s);
+  let speed = 1;
+  let pause = 1;
+  if (/[?]["»”)]*$/.test(s)) {
+    speed = 0.97;
+    pause = 1.5;
+  } else if (/(…|\.\.\.)["»”)]*$/.test(s)) pause = 2;
+  else if (/!["»”)]*$/.test(s)) speed = 1.04;
+  if (n <= 4) {
+    speed *= 0.94;
+    pause = Math.max(pause, 1.35);
+  } else if (n >= 14) speed *= 1.04;
+  return { speed, pause };
 }
 
 /** Sentence split used to synthesize narration in natural units. */

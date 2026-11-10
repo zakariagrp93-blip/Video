@@ -53,7 +53,7 @@ export class OpenAITTSProvider implements TTSProvider {
 
   async synthesize(req: SynthesisRequest, ctx: ProviderContext): Promise<SynthesisResult> {
     const model = this.model();
-    const key = hashOf({ p: 'openai', m: model, v: req.voiceId, t: req.text, s: req.speed, l: req.language }, 32);
+    const key = hashOf({ p: 'openai', i: 2, m: model, v: req.voiceId, t: req.text, s: req.speed, l: req.language }, 32);
     const cached = await ctx.cache.get('tts', key, 'wav');
     if (cached) {
       const buf = decodeWav(await fsp.readFile(cached));
@@ -69,7 +69,7 @@ export class OpenAITTSProvider implements TTSProvider {
           input: req.text,
           response_format: 'wav',
           speed: req.speed,
-          instructions: `Speak natural ${LANGUAGE_LABELS[req.language]} with a calm, confident storytelling tone, like a short educational finance video.`,
+          instructions: `Speak natural, native ${LANGUAGE_LABELS[req.language]} like an engaging TikTok storyteller talking to one friend: lively and warm, varied pitch and pace, a little smile in the voice. Stress the key numbers and the surprising words, let punchlines land, and keep commas light (barely a breath). Never sound like you are reading.`,
         },
         { signal: ctx.signal },
       );

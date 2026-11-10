@@ -84,13 +84,18 @@ describe('subtitle engine', () => {
   });
 
   it('maps provider word timestamps onto display tokens (numbers spoken as several words)', () => {
-    const tokens = ['Tu', 'as', '1 000 000 €', '!'];
-    const spoken = ['Tu', 'as', '1000000', 'euros'].map((t, i) => ({ text: t, start: i * 0.4, end: i * 0.4 + 0.3 }));
+    const tokens = ['Tu', 'as', '93 000 €', '!'];
+    const spoken = ['Tu', 'as', '93000', 'euros'].map((t, i) => ({ text: t, start: i * 0.4, end: i * 0.4 + 0.3 }));
     const mapped = mapProviderWords(tokens, spoken, 'fr')!;
-    expect(mapped[2]!.text).toBe('1 000 000 €');
+    expect(mapped[2]!.text).toBe('93 000 €');
     expect(mapped[2]!.start).toBeCloseTo(0.8);
     expect(mapped[2]!.end).toBeCloseTo(1.5);
     expect(mapped[3]!.start).toBeCloseTo(1.5);
+    // Round millions are spoken as words ("1 million d’euros") — three provider words.
+    const spokenM = ['Tu', 'as', '1', 'million', 'd’euros'].map((t, i) => ({ text: t, start: i * 0.4, end: i * 0.4 + 0.3 }));
+    const m = mapProviderWords(['Tu', 'as', '1 000 000 €'], spokenM, 'fr')!;
+    expect(m[2]!.start).toBeCloseTo(0.8);
+    expect(m[2]!.end).toBeCloseTo(1.9);
   });
 
   it('anchors phrase boundaries on real pauses in the audio', () => {
