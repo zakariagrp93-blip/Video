@@ -5,6 +5,7 @@
  *
  * Options: --topic, --lang fr|en|es|de, --duration 30|45|60|90|auto, --narrator male|female|auto,
  *          --style educational|hypothetical|facts|storytelling|unexpected, --visual minimal-finance|custom-brand,
+ *          --category finance|motivation, --music auto|phonk|epic|piano (motivation edits),
  *          --data <dir> (default ./fvs-data), --bundle <remotion bundle dir>, --out <file.mp4>, --quality standard|high|max
  * Uses the settings stored in the data dir; API keys can be supplied via FVS_*_API_KEY env vars.
  */
@@ -39,6 +40,8 @@ async function main(): Promise<void> {
     narrator: arg('narrator', 'auto'),
     storytelling: arg('style', 'hypothetical'),
     visualStyle: arg('visual', 'minimal-finance'),
+    category: arg('category', 'finance'),
+    editMusic: arg('music', 'auto'),
   });
   const project = await studio.projects.create(options);
   console.log(`Project ${project.id} → ${studio.projects.dirFor(project.id)}`);

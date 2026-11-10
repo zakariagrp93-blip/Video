@@ -3,7 +3,8 @@ import type { GenerationOptions, Script, Storyboard } from '../../../shared/sche
 import { hashOf } from '../../util/hash';
 import type { ConnectionTestResult, LLMProvider, ProviderContext, SceneReview, ScriptRequest } from '../types';
 import { LlmReviewSchema, LlmScriptSchema, LlmStoryboardSchema, scriptFromLlm, storyboardFromLlm } from './llmSchemas';
-import { REVIEW_SYSTEM, SCRIPT_SYSTEM, STORYBOARD_SYSTEM, reviewUserPrompt, scriptUserPrompt, storyboardUserPrompt } from './prompts';
+import { MOTIVATION_SCRIPT_SYSTEM, REVIEW_SYSTEM, SCRIPT_SYSTEM, STORYBOARD_SYSTEM, motivationUserPrompt, reviewUserPrompt, scriptUserPrompt, storyboardUserPrompt } from './prompts';
+import { motivationStoryboard } from '../../motivation/motivation';
 
 export interface JsonRequest<S extends z.ZodType> {
   name: string;
@@ -50,12 +51,18 @@ export abstract class RemoteLLMProvider implements LLMProvider {
   }
 
   async generateScript(req: ScriptRequest, ctx: ProviderContext, feedback?: string[]): Promise<Script> {
-    const raw = await this.cachedJson({ name: 'script', system: SCRIPT_SYSTEM, prompt: scriptUserPrompt(req, feedback), schema: LlmScriptSchema }, ctx, !feedback?.length);
+    const motivation = req.options.category === 'motivation';
+    const raw = await this.cachedJson(
+      { name: motivation ? 'motivation-script' : 'script', system: motivation ? MOTIVATION_SCRIPT_SYSTEM : SCRIPT_SYSTEM, prompt: motivation ? motivationUserPrompt(req, feedback) : scriptUserPrompt(req, feedback), schema: LlmScriptSchema },
+      ctx,
+      !feedback?.length,
+    );
     return scriptFromLlm(raw, req, this.id, this.model);
   }
 
-  async generateStoryboard(script: Script, _req: ScriptRequest, ctx: ProviderContext, feedback?: string[]): Promise<Storyboard> {
-    void _req;
+  async generateStoryboard(script: Script, req: ScriptRequest, ctx: ProviderContext, feedback?: string[]): Promise<Storyboard> {
+    // Motivation edits are directed deterministically from the shot notes in the script.
+    if (req.options.category === 'motivation') return motivationStoryboard(script);
     const raw = await this.cachedJson({ name: 'storyboard', system: STORYBOARD_SYSTEM, prompt: storyboardUserPrompt(script, feedback), schema: LlmStoryboardSchema }, ctx, !feedback?.length);
     return storyboardFromLlm(raw, script);
   }

@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  CATEGORIES,
+  CATEGORY_LABELS,
   DURATION_OPTIONS,
+  EDIT_MUSIC_LABELS,
+  EDIT_MUSIC_STYLES,
   LANGUAGES,
   LANGUAGE_LABELS,
   NARRATOR_OPTIONS,
@@ -8,7 +12,9 @@ import {
   STORYTELLING_STYLES,
   VISUAL_STYLES,
   VISUAL_STYLE_LABELS,
+  type Category,
   type DurationOption,
+  type EditMusicStyle,
   type Language,
   type NarratorOption,
   type StorytellingStyle,
@@ -19,6 +25,11 @@ import type { Navigate } from '../App';
 import { api, errorText } from '../api';
 import { IconSpark } from '../components/Icons';
 import { Badge, Button, Card, Field, Segmented, Select, useToast } from '../components/ui';
+
+const MOTIVATION_EXAMPLES: Record<'fr' | 'en', string[]> = {
+  fr: ['Motivation argent : personne ne viendra te rendre riche', 'Discipline : se lever à 5h pendant qu’ils dorment', 'Réussite : ils ont ri de ton rêve', 'Mental : ton plus grand ennemi, c’est ta tête'],
+  en: ['Money motivation: nobody is coming to make you rich', 'Discipline: up at 5 a.m. while they sleep', 'Success: they laughed at your dream', 'Mindset: your biggest enemy is your own head'],
+};
 
 const EXAMPLES = [
   'What if you received €1 million at age 18?',
@@ -36,6 +47,8 @@ export function Generator({ navigate }: { navigate: Navigate }) {
   const [narrator, setNarrator] = useState<NarratorOption>('auto');
   const [storytelling, setStorytelling] = useState<StorytellingStyle>('hypothetical');
   const [visualStyle, setVisualStyle] = useState<VisualStyle>('minimal-finance');
+  const [category, setCategory] = useState<Category>('finance');
+  const [editMusic, setEditMusic] = useState<EditMusicStyle>('auto');
   const [problems, setProblems] = useState<string[]>([]);
   const [providers, setProviders] = useState<ProviderInfoDTO | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -49,7 +62,12 @@ export function Generator({ navigate }: { navigate: Navigate }) {
       });
   }, []);
 
-  const options = useMemo(() => ({ topic: topic.trim(), duration, language, narrator, storytelling, visualStyle }), [topic, duration, language, narrator, storytelling, visualStyle]);
+  const options = useMemo(
+    () => ({ topic: topic.trim(), duration, language, narrator, storytelling, visualStyle, category, editMusic }),
+    [topic, duration, language, narrator, storytelling, visualStyle, category, editMusic],
+  );
+  const motivation = category === 'motivation';
+  const examples = motivation ? MOTIVATION_EXAMPLES[language === 'en' ? 'en' : 'fr'] : EXAMPLES;
 
   // Live preflight: tells the user *before* generating if a provider cannot handle the request.
   useEffect(() => {
@@ -87,11 +105,14 @@ export function Generator({ navigate }: { navigate: Navigate }) {
       <p className="muted">Enter a topic. Everything else — script, scenes, voice, animation, subtitles and export — is automatic.</p>
 
       <Card>
+        <Field label="Category" hint={motivation ? 'Cinematic black-and-gold shots, a deep narrator, a beat-synced soundtrack and huge words on screen.' : 'The white mascot tells a finance story with objects, charts and captions.'}>
+          <Segmented value={category} onChange={setCategory} options={CATEGORIES.map((c) => ({ value: c, label: CATEGORY_LABELS[c] }))} />
+        </Field>
         <Field label="Topic" error={tooShort ? 'Topic is too short (min 8 characters).' : null} hint="One question or scenario works best.">
-          <textarea className="input topic" value={topic} maxLength={300} placeholder={EXAMPLES[0]} onChange={(e) => setTopic(e.target.value)} rows={3} autoFocus />
+          <textarea className="input topic" value={topic} maxLength={300} placeholder={examples[0]} onChange={(e) => setTopic(e.target.value)} rows={3} autoFocus />
         </Field>
         <div className="chips">
-          {EXAMPLES.map((ex) => (
+          {examples.map((ex) => (
             <button key={ex} className="chip" onClick={() => setTopic(ex)}>
               {ex}
             </button>
@@ -108,12 +129,20 @@ export function Generator({ navigate }: { navigate: Navigate }) {
           <Field label="Narration">
             <Segmented value={narrator} onChange={setNarrator} options={NARRATOR_OPTIONS.map((n) => ({ value: n, label: n === 'auto' ? 'Automatic' : n === 'male' ? 'Male' : 'Female' }))} />
           </Field>
-          <Field label="Storytelling">
-            <Select value={storytelling} onChange={setStorytelling} options={STORYTELLING_STYLES.map((s) => ({ value: s, label: STORYTELLING_LABELS[s] }))} />
-          </Field>
-          <Field label="Visual style" hint={visualStyle === 'custom-brand' ? 'Uses the brand name and colours from Settings.' : 'Black background, white mascot, yellow and red highlights.'}>
-            <Select value={visualStyle} onChange={setVisualStyle} options={VISUAL_STYLES.map((s) => ({ value: s, label: VISUAL_STYLE_LABELS[s] }))} />
-          </Field>
+          {motivation ? (
+            <Field label="Music" hint="Automatic picks the style that fits the theme (money/discipline → phonk, success → epic, mindset → piano).">
+              <Select value={editMusic} onChange={setEditMusic} options={EDIT_MUSIC_STYLES.map((m) => ({ value: m, label: EDIT_MUSIC_LABELS[m] }))} />
+            </Field>
+          ) : (
+            <>
+              <Field label="Storytelling">
+                <Select value={storytelling} onChange={setStorytelling} options={STORYTELLING_STYLES.map((s) => ({ value: s, label: STORYTELLING_LABELS[s] }))} />
+              </Field>
+              <Field label="Visual style" hint={visualStyle === 'custom-brand' ? 'Uses the brand name and colours from Settings.' : 'Black background, white mascot, yellow and red highlights.'}>
+                <Select value={visualStyle} onChange={setVisualStyle} options={VISUAL_STYLES.map((s) => ({ value: s, label: VISUAL_STYLE_LABELS[s] }))} />
+              </Field>
+            </>
+          )}
           <Field label="Generation mode">
             <div className="mode-pill">
               <IconSpark size={14} /> Fully automatic

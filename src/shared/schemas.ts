@@ -1,5 +1,8 @@
 import { z } from 'zod';
 import {
+  CATEGORIES,
+  EDIT_MUSIC_STYLES,
+  MOTIFS,
   BACKGROUNDS,
   CAMERA_MOVES,
   CHARACTER_MOTIONS,
@@ -37,6 +40,10 @@ export const GenerationOptionsSchema = z.object({
   narrator: z.enum(NARRATOR_OPTIONS),
   storytelling: z.enum(STORYTELLING_STYLES),
   visualStyle: z.enum(VISUAL_STYLES),
+  /** 'finance' = mascot stories; 'motivation' = cinematic motivation edits. */
+  category: z.enum(CATEGORIES).optional(),
+  /** Music style for motivation edits. */
+  editMusic: z.enum(EDIT_MUSIC_STYLES).optional(),
 });
 export type GenerationOptions = z.infer<typeof GenerationOptionsSchema>;
 
@@ -154,6 +161,8 @@ export const StoryboardSceneSchema = z.object({
   textOverlay: TextOverlaySchema.nullable(),
   chart: ChartSchema.nullable(),
   sfx: z.array(SceneSfxSchema).max(3),
+  /** Motivation edits: the full-frame cinematic shot (the hero object is props[0]). */
+  motif: z.enum(MOTIFS).optional(),
 });
 export type StoryboardScene = z.infer<typeof StoryboardSceneSchema>;
 
@@ -256,7 +265,11 @@ export const VideoPlanSchema = z.object({
   characterId: z.string(),
   /** 'cinema' = wide illustration band + title banner + sentence captions; 'tall' = full frame. */
   layout: z.enum(['cinema', 'tall']).default('tall'),
-  captionMode: z.enum(['sentence', 'karaoke']).default('karaoke'),
+  captionMode: z.enum(['sentence', 'karaoke', 'kinetic']).default('karaoke'),
+  /** 'story' = mascot scenes; 'edit' = motivation edit (full-frame motifs + kinetic typography). */
+  mode: z.enum(['story', 'edit']).optional(),
+  /** Music beat grid (seconds) so cuts and pulses land on the beat. */
+  beat: z.object({ bpm: z.number().positive(), offset: z.number(), dropAt: z.number().min(0) }).optional(),
   /** Persistent title banner (the video's hook question) in the cinematic layout. */
   banner: z.string().max(140).optional(),
   /** Colour treatment applied to object illustrations. */
@@ -283,6 +296,8 @@ export const AudioPlanSchema = z.object({
   sfx: z.array(SfxEventSchema),
   sfxVolume: z.number(),
   narrationVolume: z.number(),
+  /** Mix profile: 'edit' keeps the music up front and adds a hall reverb to the voice. */
+  profile: z.enum(['story', 'edit']).optional(),
 });
 export type AudioPlan = z.infer<typeof AudioPlanSchema>;
 

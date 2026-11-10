@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { decodePng } from '../pngDecode';
 import { FFmpeg, resolveMediaBinaries } from '../../src/core/media/ffmpeg';
 import { renderCharacterSheet, renderSceneChunks, renderStillFrame, validateMp4 } from '../../src/core/render/renderer';
-import { samplePlan } from '../../src/remotion/samplePlan';
+import { sampleEditPlan, samplePlan } from '../../src/remotion/samplePlan';
 
 const serveUrl = path.resolve('build/remotion-bundle');
 const browserExecutable = process.env.FVS_BROWSER ?? null;
@@ -26,6 +26,17 @@ describe('scene composition and rendering', () => {
     const f = brightFraction(out);
     expect(f).toBeGreaterThan(0.03); // white mascot + text present
     expect(f).toBeLessThan(0.6); // still a dark composition
+  });
+
+  it('renders every motivation-edit shot with its kinetic words', async () => {
+    const plan = sampleEditPlan(2);
+    for (const sc of plan.scenes) {
+      const out = path.join(dir, `edit-${sc.id}.png`);
+      await renderStillFrame(plan, sc.startFrame + 40, out, { serveUrl, browserExecutable });
+      const f = brightFraction(out);
+      expect(f, `${sc.motif}`).toBeGreaterThan(0.004); // big white words on a dark shot
+      expect(f, `${sc.motif}`).toBeLessThan(0.35);
+    }
   });
 
   it('renders the character reference sheet', async () => {

@@ -4,7 +4,7 @@ import { VIDEO_FPS, VIDEO_HEIGHT, VIDEO_WIDTH } from '../shared/constants';
 import { CharacterSheet } from './CharacterSheet';
 import { FinanceVideo, type FinanceVideoProps } from './FinanceVideo';
 import { IconSheet } from './IconSheet';
-import { samplePlan } from './samplePlan';
+import { sampleEditPlan, samplePlan } from './samplePlan';
 
 export const COMPOSITION_ID = 'FinanceVideo';
 
@@ -19,6 +19,15 @@ export const RemotionRoot: React.FC = () => (
     fps={VIDEO_FPS}
     durationInFrames={samplePlan(14, 2, 'cinema').durationInFrames}
     defaultProps={{ plan: samplePlan(14, 2, 'cinema') } satisfies FinanceVideoProps}
+  />
+  <Composition
+    id="EditPreview"
+    component={FinanceVideo}
+    width={VIDEO_WIDTH}
+    height={VIDEO_HEIGHT}
+    fps={VIDEO_FPS}
+    durationInFrames={sampleEditPlan().durationInFrames}
+    defaultProps={{ plan: sampleEditPlan() } satisfies FinanceVideoProps}
   />
   <Composition id="IconSheet" component={IconSheet} width={VIDEO_WIDTH} height={VIDEO_HEIGHT} fps={VIDEO_FPS} durationInFrames={1} />
   <Composition

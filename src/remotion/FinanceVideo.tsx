@@ -6,6 +6,7 @@ import { Captions } from './Captions';
 import { ensureFonts, FONT_FAMILY } from './fonts';
 import { CINEMA, CINEMA_SCALE, CINEMA_TOP, layoutFor, type StageLayout } from './layout';
 import { SceneView } from './SceneView';
+import { EditVideo } from './edit/EditVideo';
 
 export interface FinanceVideoProps {
   plan: VideoPlan;
@@ -14,7 +15,9 @@ export interface FinanceVideoProps {
 
 ensureFonts();
 
-export const FinanceVideo: React.FC<FinanceVideoProps> = ({ plan }) => {
+export const FinanceVideo: React.FC<FinanceVideoProps> = ({ plan }) => (plan.mode === 'edit' ? <EditVideo plan={plan} /> : <StoryVideo plan={plan} />);
+
+const StoryVideo: React.FC<{ plan: VideoPlan }> = ({ plan }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const layout = layoutFor(plan.layout);

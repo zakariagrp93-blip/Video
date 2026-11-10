@@ -33,7 +33,11 @@ export interface NarrationBuildInput {
   audioDir: string;
   ctx: ProviderContext;
   onScene?: (index: number, total: number) => void;
+  /** Pauses (s); motivation edits breathe more between lines. */
+  gaps?: { lead: number; sentence: number; scene: number; tail: number };
 }
+
+export const EDIT_GAPS = { lead: 0.25, sentence: 0.42, scene: 0.62, tail: 1.8 };
 
 /**
  * Synthesize narration sentence by sentence, measure the real audio, align
@@ -42,6 +46,7 @@ export interface NarrationBuildInput {
  */
 export async function buildNarration(input: NarrationBuildInput): Promise<NarrationManifest> {
   const { storyboard, tts, voice, language, speed, audioDir, ctx } = input;
+  const gaps = input.gaps ?? { lead: LEAD_SILENCE, sentence: SENTENCE_GAP, scene: SCENE_GAP, tail: TAIL_SILENCE };
   await ensureDir(audioDir);
   const segments: NarrationSegment[] = [];
   const sceneAudio: Float32Array[] = [];
@@ -75,8 +80,8 @@ export async function buildNarration(input: NarrationBuildInput): Promise<Narrat
       parts.push(clip);
       cursor += clip.length / NARRATION_SR;
       if (s < sentences.length - 1) {
-        parts.push(new Float32Array(Math.round(SENTENCE_GAP * NARRATION_SR)));
-        cursor += SENTENCE_GAP;
+        parts.push(new Float32Array(Math.round(gaps.sentence * NARRATION_SR)));
+        cursor += gaps.sentence;
       }
     }
     if (parts.length === 0) throw new Error(`Scene ${scene.id} has no speakable narration.`);
@@ -95,12 +100,12 @@ export async function buildNarration(input: NarrationBuildInput): Promise<Narrat
   }
 
   // Master track: lead + scene, gap, scene, … + tail.
-  let t = LEAD_SILENCE;
+  let t = gaps.lead;
   for (let i = 0; i < segments.length; i++) {
     segments[i]!.start = t;
-    t += segments[i]!.duration + (i < segments.length - 1 ? SCENE_GAP : 0);
+    t += segments[i]!.duration + (i < segments.length - 1 ? gaps.scene : 0);
   }
-  const totalDuration = t + TAIL_SILENCE;
+  const totalDuration = t + gaps.tail;
   const master = new Float32Array(Math.ceil(totalDuration * NARRATION_SR));
   for (let i = 0; i < segments.length; i++) master.set(sceneAudio[i]!, Math.round(segments[i]!.start * NARRATION_SR));
   const masterFile = safeJoin(audioDir, 'narration.wav');

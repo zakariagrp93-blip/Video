@@ -4,7 +4,11 @@ import type { AudioPlan, NarrationManifest, PlannedScene, SfxEvent, Storyboard, 
 export interface TimelineOptions {
   fps?: number;
   layout?: 'cinema' | 'tall';
-  captionMode?: 'sentence' | 'karaoke';
+  captionMode?: 'sentence' | 'karaoke' | 'kinetic';
+  mode?: 'story' | 'edit';
+  /** Music beat grid; scene cuts snap to it (motivation edits). */
+  beat?: { bpm: number; offset: number; dropAt: number };
+  snap?: (sec: number) => number;
   banner?: string;
   iconTone?: 'color' | 'muted' | 'mono';
   brand?: { name: string; accent: string; danger: string } | null;
@@ -12,20 +16,21 @@ export interface TimelineOptions {
 }
 
 /** Visual cut happens slightly before the next scene's narration begins. */
-const CUT_LEAD = 0.14;
+export const CUT_LEAD = 0.14;
 const MIN_SCENE_SEC = 1.2;
 
 /**
  * Turn measured narration timing into frame-accurate scene placement.
  */
-export function planScenes(storyboard: Storyboard, narration: NarrationManifest, fps = VIDEO_FPS): { scenes: PlannedScene[]; durationInFrames: number } {
+export function planScenes(storyboard: Storyboard, narration: NarrationManifest, fps = VIDEO_FPS, snap?: (sec: number) => number): { scenes: PlannedScene[]; durationInFrames: number } {
   const total = Math.ceil(narration.totalDuration * fps);
   const bySceneId = new Map(narration.segments.map((s) => [s.sceneId, s]));
   const starts: number[] = storyboard.scenes.map((sc, i) => {
     if (i === 0) return 0;
     const seg = bySceneId.get(sc.id);
     if (!seg) throw new Error(`Missing narration for scene ${sc.id}`);
-    return Math.max(0, Math.round((seg.start - CUT_LEAD) * fps));
+    const cut = seg.start - CUT_LEAD;
+    return Math.max(0, Math.round((snap ? snap(cut) : cut) * fps));
   });
   // Enforce monotonic starts and a minimum scene length.
   for (let i = 1; i < starts.length; i++) starts[i] = Math.max(starts[i]!, starts[i - 1]! + Math.round(MIN_SCENE_SEC * fps));
@@ -40,7 +45,7 @@ export function planScenes(storyboard: Storyboard, narration: NarrationManifest,
 
 export function buildVideoPlan(storyboard: Storyboard, narration: NarrationManifest, captions: VideoPlan['captions'], opts: TimelineOptions = {}): VideoPlan {
   const fps = opts.fps ?? VIDEO_FPS;
-  const { scenes, durationInFrames } = planScenes(storyboard, narration, fps);
+  const { scenes, durationInFrames } = planScenes(storyboard, narration, fps, opts.snap);
   const theme = { ...DEFAULT_THEME };
   if (opts.brand) {
     theme.accent = opts.brand.accent || theme.accent;
@@ -61,6 +66,7 @@ export function buildVideoPlan(storyboard: Storyboard, narration: NarrationManif
     captionMode: opts.captionMode ?? 'karaoke',
     banner: opts.banner ? opts.banner.slice(0, 140) : undefined,
     iconTone: opts.iconTone ?? 'color',
+    ...(opts.mode === 'edit' ? { mode: 'edit' as const, beat: opts.beat } : {}),
     scenes,
     captions,
     images: opts.images ?? {},
@@ -77,6 +83,7 @@ const EFFECT_SFX: Partial<Record<string, SfxType>> = {
 
 /** Derive the sound-effect timeline from the plan (scene SFX, transitions, effects). */
 export function buildSfxTimeline(plan: VideoPlan): SfxEvent[] {
+  if (plan.mode === 'edit') return buildEditSfx(plan);
   const events: SfxEvent[] = [];
   const sec = (f: number) => f / plan.fps;
   for (const sc of plan.scenes) {
@@ -100,6 +107,17 @@ export function buildSfxTimeline(plan: VideoPlan): SfxEvent[] {
   return events.filter((e, i) => !events.slice(0, i).some((p) => p.type === e.type && Math.abs(p.time - e.time) < 0.12));
 }
 
+/** Motivation edits: the music carries the rhythm; SFX only punctuate cuts and hits. */
+function buildEditSfx(plan: VideoPlan): SfxEvent[] {
+  const events: SfxEvent[] = [];
+  for (const sc of plan.scenes) {
+    const start = sc.startFrame / plan.fps;
+    if (sc.index > 0 && (sc.transition === 'zoom-through' || sc.transition === 'fade')) events.push({ type: 'whoosh', time: Math.max(0, start - 0.18), gain: 0.3 });
+    if (sc.effect === 'impact' || sc.sfx.some((s) => s.type === 'impact')) events.push({ type: 'impact', time: start, gain: 0.75 });
+  }
+  return events;
+}
+
 export function buildAudioPlan(
   plan: VideoPlan,
   narrationFile: string,
@@ -115,5 +133,6 @@ export function buildAudioPlan(
     sfx: buildSfxTimeline(plan),
     sfxVolume: volumes.sfx,
     narrationVolume: volumes.narration,
+    ...(plan.mode === 'edit' ? { profile: 'edit' as const } : {}),
   };
 }

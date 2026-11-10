@@ -8,6 +8,7 @@ import type { ConnectionTestResult, LLMProvider, ProviderContext, SceneReview, S
 import { writeArchetype, type ArchetypeOutput, type OfflineLanguage } from './archetypes';
 import { describeAction, describeVisual, type Beat } from './direction';
 import { parseTopic } from './topicParser';
+import { isMotivationLanguage, motivationStoryboard, visualNote, writeMotivation } from '../../../motivation/motivation';
 
 export const OFFLINE_SUPPORTED = [
   'windfall — "What if you received €1 million at 18?"',
@@ -41,6 +42,9 @@ export class OfflineLLMProvider implements LLMProvider {
 
   checkReady(options?: GenerationOptions): string | null {
     if (!options) return null;
+    if (options.category === 'motivation') {
+      return isMotivationLanguage(options.language) ? null : 'The offline engine writes motivation edits in French and English only. Configure an LLM provider (Settings → AI providers) for Spanish or German.';
+    }
     if (options.language !== 'fr' && options.language !== 'en') {
       return 'The offline story engine writes French and English only. Configure an LLM provider (Settings → AI providers) for Spanish or German.';
     }
@@ -85,7 +89,43 @@ export class OfflineLLMProvider implements LLMProvider {
     return { out, beats };
   }
 
+  private motivationScript(req: ScriptRequest): Script {
+    const ready = this.checkReady(req.options);
+    if (ready) throw new UserFacingError(ready);
+    const m = writeMotivation({ topic: req.options.topic, language: req.options.language as 'fr' | 'en', wordRange: req.wordRange });
+    const wps = WORDS_PER_SECOND[req.options.language];
+    return ScriptSchema.parse({
+      version: 1,
+      title: m.title,
+      hook: m.beats[0]!.text,
+      language: req.options.language,
+      storytelling: req.options.storytelling,
+      isHypothetical: false,
+      assumptions: [],
+      claims: [],
+      scenes: m.beats.map((b) => ({
+        narration: b.text,
+        visual: visualNote(b),
+        characterAction: b.motif === 'spotlight' ? 'none (hero object)' : 'silhouette',
+        camera: 'cinematic',
+        animation: 'kinetic typography',
+        sfx: b.hit ? 'impact@start' : 'whoosh',
+        durationHint: Math.min(15, Math.max(1.5, Math.round((wordCount(b.text) / wps + 0.8) * 10) / 10)),
+        emphasis: b.emphasis,
+        negative: b.negative,
+      })),
+      finalLine: m.beats[m.beats.length - 1]!.text,
+      fullNarration: m.beats.map((b) => b.text).join(' '),
+      hashtags: m.hashtags,
+      generator: { provider: this.id, model: this.model },
+    });
+  }
+
   async generateScript(req: ScriptRequest, ctx: ProviderContext): Promise<Script> {
+    if (req.options.category === 'motivation') {
+      ctx.usage({ provider: 'offline', kind: 'llm', model: this.model, units: 0, unitType: 'tokens' });
+      return this.motivationScript(req);
+    }
     const { out, beats } = this.compose(req);
     const wps = WORDS_PER_SECOND[req.options.language];
     const script: Script = {
@@ -118,6 +158,7 @@ export class OfflineLLMProvider implements LLMProvider {
   }
 
   async generateStoryboard(script: Script, req: ScriptRequest, ctx: ProviderContext): Promise<Storyboard> {
+    if (req.options.category === 'motivation') return StoryboardSchema.parse(motivationStoryboard(script));
     let beats: Beat[] = [];
     try {
       beats = this.compose(req).beats;

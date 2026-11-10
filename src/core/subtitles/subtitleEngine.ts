@@ -31,6 +31,17 @@ export const SENTENCE_CAPTION_OPTIONS: CaptionOptions = {
   maxGap: 1.2,
 };
 
+/** Motivation edits: 1–3 huge words at a time, cut on punctuation. */
+export const KINETIC_CAPTION_OPTIONS: CaptionOptions = {
+  fps: 30,
+  maxWordsPerCue: 3,
+  maxCharsPerCue: 20,
+  minCueSeconds: 0.35,
+  holdSeconds: 0.3,
+  breakAfter: /[.!?…:,;]$/,
+  maxGap: 0.45,
+};
+
 export function normalizeWord(w: string): string {
   return w
     .toLowerCase()

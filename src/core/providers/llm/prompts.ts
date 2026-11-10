@@ -5,6 +5,7 @@ import {
   EFFECTS,
   EXPRESSIONS,
   LANGUAGE_LABELS,
+  MOTIFS,
   POSES,
   PROP_ANIMATIONS,
   PROP_ASSETS,
@@ -40,6 +41,34 @@ export function scriptUserPrompt(req: ScriptRequest, feedback?: string[]): strin
     `Scenes: between 8 and 15. durationHint = estimated seconds for that scene.`,
     'The first scene narration must start with the hook. The last scene narration must contain the final line.',
     'visual / characterAction / camera / animation / sfx: short English production notes for the animator.',
+    feedback?.length ? `\nYour previous attempt was rejected for these reasons — fix all of them:\n- ${feedback.join('\n- ')}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+export const MOTIVATION_SCRIPT_SYSTEM = `You write narration for short vertical motivation edits (TikTok / Reels / Shorts) about money, discipline, success and mindset: cinematic black-and-gold shots, a deep calm narrator, a hard-hitting beat, huge words on screen.
+
+Writing rules:
+- 8 to 15 scenes. One short line per scene (4 to 16 words): punchy, rhythmic, spoken. Pauses matter as much as words.
+- Scene 1 is the hook: a confronting statement that stops the scroll in 2 seconds. No greetings, no questions to the audience like "did you know".
+- Arc: hook → the uncomfortable truth → the shift in thinking → the grind (what to do, daily) → the vision (what it becomes) → a final line that hits.
+- Talk to one person ("you" / "tu"). Original lines only: no famous quotes, no names of real people, no brands.
+- No financial promises, no get-rich-quick claims, no specific returns, no invented statistics. Motivation, not advice.
+- Avoid clichés of AI writing (unlock, journey, game-changer, delve) and repetitive sentence openings.
+- "emphasis": the 1–2 exact words of the line that carry it (shown in gold). "negative": exact words for pain/loss (shown in red), often empty.
+- "visual": start with "motif:<one of the shot names>" chosen to match the line, then for motif:spotlight add "hero:<prop>". Shot names: ${MOTIFS.join(', ')}. Props for hero: sports-car, mansion, yacht, money-stack, coin-stack, credit-card, hourglass, trophy, diploma, lock, clock, laptop, briefcase.
+- Mark the second line and the last line with " hit" at the end of "visual" (the beat drop / final impact).`;
+
+export function motivationUserPrompt(req: ScriptRequest, feedback?: string[]): string {
+  const { options } = req;
+  return [
+    `Topic / angle: ${options.topic}`,
+    `Language: ${LANGUAGE_LABELS[options.language]} (${options.language}). Write everything spoken in this language, with a natural spoken rhythm — not a translation.`,
+    `Target length: about ${req.targetSeconds} seconds including dramatic pauses, i.e. ${req.wordRange[0]}–${req.wordRange[1]} spoken words in total.`,
+    'isHypothetical = false, assumptions = [], claims = [].',
+    'The first scene narration must start with the hook. The last scene narration must contain the final line.',
+    'characterAction / camera / animation / sfx: short English notes (free text).',
     feedback?.length ? `\nYour previous attempt was rejected for these reasons — fix all of them:\n- ${feedback.join('\n- ')}` : '',
   ]
     .filter(Boolean)

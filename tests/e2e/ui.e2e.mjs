@@ -85,8 +85,8 @@ try {
 
   // Regression: entering an ElevenLabs voice ID must not reset the TTS provider.
   await win.selectOption('.field:has-text("Voice (TTS)") select', 'elevenlabs');
-  await win.waitForSelector('text=Female voice ID');
-  const femaleInput = win.locator('.field:has-text("Female voice ID") input');
+  await win.waitForSelector('text=Female voice');
+  const femaleInput = win.locator('.field:has-text("Female voice") input');
   await femaleInput.fill('test-voice-id-123');
   await femaleInput.press('Enter');
   await win.waitForTimeout(500);
@@ -106,6 +106,13 @@ try {
   await win.waitForSelector('.alert-danger >> text=could not recognise');
   const disabled = await win.isDisabled('text=GENERATE VIDEO');
   assert(disabled, 'generate must be disabled for an unsupported topic');
+
+  // Motivation edits accept any topic offline (no recognised finance scenario needed).
+  await win.click('.segmented button:has-text("Motivation edit")');
+  await win.waitForSelector('text=Music');
+  await win.waitForFunction(() => !document.querySelector('.alert-danger'));
+  await win.screenshot({ path: path.join(shots, '2b-generator-motivation.png') });
+  await win.click('.segmented button:has-text("Finance story")');
 
   await win.fill('textarea', 'What if you received €1 million at age 18?');
   await win.click('.segmented button:has-text("30 s")');

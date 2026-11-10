@@ -4,6 +4,9 @@ import type { LLMProvider, ProviderContext, ScriptRequest } from '../providers/t
 import { wordCount } from '../text/speech';
 import { UserFacingError } from '../util/errors';
 
+/** Motivation edits are narrated a little slower than stories. */
+export const EDIT_SPEED = 0.9;
+
 export function resolveTargetSeconds(duration: DurationOption, storytelling: GenerationOptions['storytelling']): number {
   if (duration !== 'auto') return Number(duration);
   return storytelling === 'facts' ? 45 : 60;
@@ -11,9 +14,11 @@ export function resolveTargetSeconds(duration: DurationOption, storytelling: Gen
 
 export function buildScriptRequest(options: GenerationOptions, speed = 1): ScriptRequest {
   const targetSeconds = resolveTargetSeconds(options.duration, options.storytelling);
-  // Leave ~12% of the duration for pauses between sentences and scenes.
-  const wps = WORDS_PER_SECOND[options.language] * speed;
-  const ideal = targetSeconds * 0.88 * wps;
+  // Leave ~12% of the duration for pauses between sentences and scenes;
+  // motivation edits are read slower, with long dramatic pauses.
+  const edit = options.category === 'motivation';
+  const wps = WORDS_PER_SECOND[options.language] * speed * (edit ? EDIT_SPEED : 1);
+  const ideal = targetSeconds * (edit ? 0.7 : 0.88) * wps;
   return { options, targetSeconds, wordRange: [Math.round(ideal * 0.8), Math.round(ideal * 1.15)] };
 }
 

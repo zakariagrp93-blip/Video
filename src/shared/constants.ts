@@ -35,6 +35,48 @@ export const STORYTELLING_LABELS: Record<StorytellingStyle, string> = {
   unexpected: 'Unexpected scenario',
 };
 
+/** Content families. Each one has its own writer, art direction, music and captions. */
+export const CATEGORIES = ['finance', 'motivation'] as const;
+export type Category = (typeof CATEGORIES)[number];
+export const CATEGORY_LABELS: Record<Category, string> = {
+  finance: 'Finance story (mascot)',
+  motivation: 'Motivation edit (money, discipline, mindset)',
+};
+
+/** Music for motivation edits. */
+export const EDIT_MUSIC_STYLES = ['auto', 'phonk', 'epic', 'piano'] as const;
+export type EditMusicStyle = (typeof EDIT_MUSIC_STYLES)[number];
+export const EDIT_MUSIC_LABELS: Record<EditMusicStyle, string> = {
+  auto: 'Automatic',
+  phonk: 'Dark phonk (808 + cowbell)',
+  epic: 'Epic cinematic (drums + strings)',
+  piano: 'Emotional piano',
+};
+
+/** Themes the motivation writer knows. */
+export const MOTIVATION_THEMES = ['money', 'discipline', 'success', 'mindset'] as const;
+export type MotivationTheme = (typeof MOTIVATION_THEMES)[number];
+
+/**
+ * Full-frame cinematic "shots" for motivation edits (original vector scenes in
+ * src/remotion/edit/motifs.tsx). "spotlight" shows the scene's hero prop.
+ */
+export const MOTIFS = [
+  'skyline',
+  'road',
+  'mountain',
+  'stairs',
+  'rain',
+  'chess',
+  'alarm',
+  'spotlight',
+  'sunrise',
+  'gym',
+  'crowd',
+  'desk',
+] as const;
+export type Motif = (typeof MOTIFS)[number];
+
 export const VISUAL_STYLES = ['minimal-finance', 'custom-brand', 'full-frame'] as const;
 export type VisualStyle = (typeof VISUAL_STYLES)[number];
 

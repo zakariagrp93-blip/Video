@@ -15,7 +15,9 @@ import {
   type Storyboard,
   type VideoPlan,
 } from '../../shared/schemas';
-import { buildNarration } from '../audio/narration';
+import { EDIT_GAPS, buildNarration } from '../audio/narration';
+import { beatGrid, generateEditMusic, snapToGrid, type EditStyle } from '../audio/editMusic';
+import { detectTheme, motivationStoryboard } from '../motivation/motivation';
 import { mixAudio } from '../audio/mixer';
 import { generateMusic, seedFrom } from '../audio/synth';
 import { encodeWav } from '../audio/wav';
@@ -25,16 +27,23 @@ import { projectPaths, type ProjectPaths } from '../projects/projectStore';
 import type { ProviderContext } from '../providers/types';
 import { startAssetServer } from '../render/assetServer';
 import { assembleFinal, ensureRenderBrowser, extractThumbnail, renderCharacterSheet, renderSceneChunks, validateMp4 } from '../render/renderer';
-import { buildScriptRequest, generateValidatedScript } from '../script/scriptEngine';
+import { EDIT_SPEED, buildScriptRequest, generateValidatedScript } from '../script/scriptEngine';
 import { generateValidatedStoryboard } from '../storyboard/storyboardEngine';
 import type { Studio } from '../studio';
-import { DEFAULT_CAPTION_OPTIONS, SENTENCE_CAPTION_OPTIONS, absoluteWords, buildCaptions, toSrt, validateCaptions } from '../subtitles/subtitleEngine';
-import { buildAudioPlan, buildVideoPlan, planScenes } from '../timing/timeline';
+import { DEFAULT_CAPTION_OPTIONS, KINETIC_CAPTION_OPTIONS, SENTENCE_CAPTION_OPTIONS, absoluteWords, buildCaptions, toSrt, validateCaptions } from '../subtitles/subtitleEngine';
+import { CUT_LEAD, buildAudioPlan, buildVideoPlan, planScenes } from '../timing/timeline';
 import { CancelledError, StageError, UserFacingError, errorMessage, isRetryable, throwIfAborted } from '../util/errors';
 import { ensureDir, exists, readJson, safeJoin, sanitizeFileName, writeFileAtomic, writeJson } from '../util/fsx';
 import { hashOf } from '../util/hash';
 import { withRetry } from '../util/retry';
 import { EtaEstimator, overallProgress, type ProgressEvent } from './progress';
+
+/** Soundtrack for an edit: the user's choice, or one that fits the theme. */
+export function resolveEditStyle(options: Project['options']): EditStyle {
+  if (options.editMusic && options.editMusic !== 'auto') return options.editMusic;
+  const theme = detectTheme(options.topic);
+  return theme === 'success' ? 'epic' : theme === 'mindset' ? 'piano' : 'phonk';
+}
 
 export interface RunOptions {
   signal?: AbortSignal;
@@ -247,6 +256,12 @@ export class GenerationPipeline {
     const script = ScriptSchema.parse(await readJson(s.paths.scriptJson));
     const req = buildScriptRequest(s.project.options, settings.speakingSpeed);
     s.report(0.1, 'Directing scenes…');
+    if (s.project.options.category === 'motivation') {
+      // Edits are directed deterministically from the shot notes (no LLM call, no cost).
+      const storyboard = StoryboardSchema.parse(motivationStoryboard(script));
+      await writeJson(s.paths.storyboardJson, storyboard);
+      return `${storyboard.scenes.length} cinematic shots directed`;
+    }
     const { storyboard, warnings } = await generateValidatedStoryboard(llm, script, req, s.ctx, llm.isLocal ? 1 : 3);
     warnings.forEach(s.warn);
     await writeJson(s.paths.storyboardJson, StoryboardSchema.parse(storyboard));
@@ -309,7 +324,9 @@ export class GenerationPipeline {
     const settings = this.studio.settings.get();
     const sb = StoryboardSchema.parse(await readJson(s.paths.storyboardJson));
     const tts = this.studio.providers.currentTts();
-    const voice = await tts.resolveVoice(s.project.options.language, s.project.options.narrator);
+    const edit = s.project.options.category === 'motivation';
+    // Motivation edits default to a deep male narrator.
+    const voice = await tts.resolveVoice(s.project.options.language, edit && s.project.options.narrator === 'auto' ? 'male' : s.project.options.narrator);
     if (tts.prepareVoice && !voice.installed) {
       s.report(0.02, `Downloading voice ${voice.label}…`);
       await tts.prepareVoice(voice, s.ctx, (f) => s.report(0.02 + f * 0.18, `Downloading voice ${voice.label}… ${Math.round(f * 100)}%`));
@@ -319,7 +336,8 @@ export class GenerationPipeline {
       tts,
       voice,
       language: s.project.options.language,
-      speed: settings.speakingSpeed,
+      speed: settings.speakingSpeed * (edit ? EDIT_SPEED : 1),
+      gaps: edit ? EDIT_GAPS : undefined,
       audioDir: s.paths.audioDir,
       ctx: s.ctx,
       onScene: (i, n) => s.report(0.2 + (0.8 * i) / n, `Narrating scene ${i + 1}/${n} (${voice.label})`, { scene: { index: i, total: n } }),
@@ -333,26 +351,45 @@ export class GenerationPipeline {
     const sb = StoryboardSchema.parse(await readJson(s.paths.storyboardJson));
     const narration = NarrationManifestSchema.parse(await readJson(path.join(s.paths.audioDir, 'narration.json')));
     s.report(0.1, 'Synchronising scene timing to the narration…');
-    const { scenes, durationInFrames } = planScenes(sb, narration, VIDEO_FPS);
-    const brand = s.project.options.visualStyle === 'custom-brand' ? settings.brand : null;
-    const cinematic = s.project.options.visualStyle !== 'full-frame';
+    const edit = s.project.options.category === 'motivation';
+    const seed = seedFrom(s.project.id);
+    // Edits: the drop lands on the second line's cut; every other cut snaps to the beat.
+    const editStyle = edit ? resolveEditStyle(s.project.options) : null;
+    const second = narration.segments[1];
+    const grid = editStyle ? beatGrid(editStyle, seed, Math.max(0.5, (second?.start ?? 2) - CUT_LEAD)) : null;
+    const snap = grid ? (t: number) => snapToGrid(t, grid) : undefined;
+    const { scenes, durationInFrames } = planScenes(sb, narration, VIDEO_FPS, snap);
+    const cinematic = !edit && s.project.options.visualStyle !== 'full-frame';
     const script = ScriptSchema.parse(await readJson(s.paths.scriptJson));
     const draft = buildVideoPlan(sb, narration, [], {
-      brand,
+      // Edits show the brand tag only when a brand name is set; their colours stay black and gold.
+      brand: edit ? (settings.brand.name ? settings.brand : null) : s.project.options.visualStyle === 'custom-brand' ? settings.brand : null,
       images: {},
       layout: cinematic ? 'cinema' : 'tall',
-      captionMode: cinematic ? 'sentence' : 'karaoke',
+      captionMode: edit ? 'kinetic' : cinematic ? 'sentence' : 'karaoke',
       banner: cinematic ? script.title : undefined,
       iconTone: settings.iconTone,
+      mode: edit ? 'edit' : 'story',
+      beat: grid ?? undefined,
+      snap,
     });
     await writeJson(path.join(s.paths.renderDir, 'timeline.draft.json'), draft);
 
     s.report(0.3, 'Composing music…');
     const durationSec = durationInFrames / VIDEO_FPS;
     const musicFile = path.join(s.paths.audioDir, 'music.wav');
-    if (settings.musicEnabled) {
+    if (settings.musicEnabled && editStyle && grid) {
+      const key = hashOf({ v: 'edit-music-1', seed, d: Math.ceil(durationSec), editStyle, grid }, 32);
+      const cached = await s.ctx.cache.get('music', key, 'wav');
+      if (cached) await fsp.copyFile(cached, musicFile);
+      else {
+        s.report(0.35, `Composing ${editStyle} soundtrack…`);
+        const wav = encodeWav(generateEditMusic({ durationSec: durationSec + 0.5, seed, style: editStyle, grid }));
+        await writeFileAtomic(musicFile, wav);
+        await s.ctx.cache.put('music', key, 'wav', wav, 'procedural');
+      }
+    } else if (settings.musicEnabled) {
       const mood = s.project.options.storytelling === 'unexpected' ? 'tense' : s.project.options.storytelling === 'hypothetical' ? 'upbeat' : 'calm';
-      const seed = seedFrom(s.project.id);
       const key = hashOf({ v: 'music-1', seed, d: Math.ceil(durationSec), mood }, 32);
       const cached = await s.ctx.cache.get('music', key, 'wav');
       if (cached) await fsp.copyFile(cached, musicFile);
@@ -382,7 +419,7 @@ export class GenerationPipeline {
     const narration = NarrationManifestSchema.parse(await readJson(path.join(s.paths.audioDir, 'narration.json')));
     s.report(0.2, 'Aligning subtitles to the voice…');
     const words = absoluteWords(narration, draft.scenes.map((x) => x.id));
-    const captions = buildCaptions(words, draft.scenes, draft.captionMode === 'sentence' ? SENTENCE_CAPTION_OPTIONS : DEFAULT_CAPTION_OPTIONS);
+    const captions = buildCaptions(words, draft.scenes, draft.captionMode === 'sentence' ? SENTENCE_CAPTION_OPTIONS : draft.captionMode === 'kinetic' ? KINETIC_CAPTION_OPTIONS : DEFAULT_CAPTION_OPTIONS);
     const issues = validateCaptions(captions, draft.durationInFrames);
     if (issues.length) throw new StageError('subtitles', `Subtitle timing invalid: ${issues.slice(0, 3).join('; ')}`, false);
     await writeJson(path.join(s.paths.subtitlesDir, 'captions.json'), captions);

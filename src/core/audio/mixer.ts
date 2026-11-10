@@ -1,5 +1,6 @@
 import type { AudioPlan } from '../../shared/schemas';
 import type { SfxType } from '../../shared/constants';
+import { reverbInPlace } from './editMusic';
 import { generateSfx } from './synth';
 import { readWav, resample, toMono, writeWav, type AudioBuffer } from './wav';
 
@@ -38,12 +39,17 @@ export async function mixAudio(plan: AudioPlan, outFile: string, musicOverride?:
   const L = new Float32Array(len);
   const R = new Float32Array(len);
 
+  const edit = plan.profile === 'edit';
   const narrBuf = await readWav(plan.narrationFile);
   const narr = resample(toMono(narrBuf), narrBuf.sampleRate, MIX_SR);
-  for (let i = 0; i < Math.min(len, narr.length); i++) {
-    const v = narr[i]! * plan.narrationVolume;
-    L[i]! += v;
-    R[i]! += v;
+  const vL = new Float32Array(Math.min(len, narr.length));
+  const vR = new Float32Array(vL.length);
+  for (let i = 0; i < vL.length; i++) vL[i] = vR[i] = narr[i]! * plan.narrationVolume;
+  // Edits: a hall around the voice, like the classic motivation-speech sound.
+  if (edit) reverbInPlace(vL, vR, MIX_SR, 0.2, 0.8, 0.35);
+  for (let i = 0; i < vL.length; i++) {
+    L[i]! += vL[i]!;
+    R[i]! += vR[i]!;
   }
 
   if (plan.music.enabled && (plan.music.file || musicOverride)) {
@@ -54,8 +60,8 @@ export async function mixAudio(plan: AudioPlan, outFile: string, musicOverride?:
     const win = Math.round(MIX_SR * 0.02);
     for (let i = 0; i < Math.min(len, mL.length); i++) {
       const e = env[Math.min(env.length - 1, Math.floor(i / win))] ?? 0;
-      const duck = 1 - 0.6 * Math.min(1, e / 0.04);
-      const g = plan.music.volume * duck;
+      const duck = 1 - (edit ? 0.42 : 0.6) * Math.min(1, e / 0.04);
+      const g = plan.music.volume * (edit ? 2.1 : 1) * duck;
       L[i]! += mL[i]! * g;
       R[i]! += mR[i]! * g;
     }
