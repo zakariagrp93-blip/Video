@@ -59,9 +59,17 @@ export class OfflineLLMProvider implements LLMProvider {
     if (ready) throw new UserFacingError(ready);
     const parsed = parseTopic(req.options.topic);
     const out = writeArchetype(parsed, req.options.language as OfflineLanguage, req.options.storytelling);
-    let beats = [...out.beats];
+    let beats = out.beats.map((b) => ({ ...b }));
     const total = () => beats.reduce((a, b) => a + wordCount(b.text), 0);
     const max = req.wordRange[1];
+    // Condense the longest beats first (keeps the story arc), then drop low-value beats.
+    const condensable = () => beats.map((b, i) => ({ b, i, gain: b.short ? wordCount(b.text) - wordCount(b.short) : 0 })).filter((x) => x.gain > 0).sort((a, b) => b.gain - a.gain);
+    while (total() > max) {
+      const next = condensable()[0];
+      if (!next) break;
+      next.b.text = next.b.short!;
+      next.b.short = undefined;
+    }
     while (total() > max && beats.length > 8) {
       let worst = 1;
       let worstScore = Infinity;

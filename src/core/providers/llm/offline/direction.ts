@@ -34,6 +34,8 @@ export interface Direction {
 
 export interface Beat {
   text: string;
+  /** Condensed narration for short videos. */
+  short?: string;
   emphasis: string[];
   negative: string[];
   dir: Direction;

@@ -246,6 +246,7 @@ export const ThemeSchema = z.object({
 export const VideoPlanSchema = z.object({
   version: z.literal(1),
   title: z.string(),
+  language: z.enum(LANGUAGES),
   fps: z.number().int().positive(),
   width: z.number().int().positive(),
   height: z.number().int().positive(),

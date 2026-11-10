@@ -45,6 +45,16 @@ describe('offline story engine', () => {
       });
     }
   }
+  for (const duration of ['30', '45', '90', 'auto'] as const) {
+    for (const topic of topics) {
+      it(`fits the ${duration} duration target: ${topic}`, async () => {
+        const { ctx } = await testContext();
+        const options = GenerationOptionsSchema.parse({ ...base, duration, topic });
+        const { script } = await generateValidatedScript(provider, buildScriptRequest(options), ctx);
+        expect(script.scenes.length).toBeGreaterThanOrEqual(8);
+      });
+    }
+  }
   it('rejects unsupported languages and topics honestly', () => {
     expect(provider.checkReady(GenerationOptionsSchema.parse({ ...base, language: 'de', topic: 'Was wäre wenn du 1 Million € erbst?' }))).toMatch(/French and English/);
     expect(provider.checkReady(GenerationOptionsSchema.parse({ ...base, topic: 'Why is the sky blue today?' }))).toMatch(/could not recognise/);

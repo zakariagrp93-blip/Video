@@ -45,6 +45,7 @@ export function buildVideoPlan(storyboard: Storyboard, narration: NarrationManif
   return {
     version: 1,
     title: storyboard.title,
+    language: storyboard.language,
     fps,
     width: VIDEO_WIDTH,
     height: VIDEO_HEIGHT,

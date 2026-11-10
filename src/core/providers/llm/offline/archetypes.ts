@@ -42,6 +42,14 @@ function makeCtx(lang: OfflineLanguage, cur: Currency, style: StorytellingStyle)
   };
 }
 
+/** Attach condensed narration variants (used for short durations). */
+function shorts(beats: Beat[], c: Ctx, list: Array<[string, string] | null>): void {
+  list.forEach((pair, i) => {
+    const b = beats[i];
+    if (pair && b) b.short = c.t(pair[0], pair[1]);
+  });
+}
+
 /** Words of a formatted amount, for subtitle emphasis. */
 function words(s: string): string[] {
   return s.split(/\s+/).filter(Boolean);
@@ -163,6 +171,20 @@ function windfall(p: ParsedTopic, c: Ctx): ArchetypeOutput {
   if (A < 900_000 || A > 1_100_000) {
     final.hypothetical = t('Recevoir cet argent, c’est de la chance. Le garder, c’est une décision.', 'Getting that money is luck. Keeping it is a decision.');
   }
+  shorts(beats, c, [
+    [age ? `Et si, à ${age} ans, tu avais ${Am} ?` : `Et si tu avais ${Am} ?`, age ? `What if you had ${Am} at ${age}?` : `What if you had ${Am}?`],
+    ['Premier réflexe : tout dépenser.', 'First instinct: spend it all.'],
+    ['Mais tout ça coûte chaque année : entretien, assurances, taxes.', 'But all of it costs money every year: upkeep, insurance, taxes.'],
+    ['Et la fortune fond, dépense après dépense.', 'And the fortune melts, one purchase at a time.'],
+    [`Autre option : tu gardes ${m(keep)} pour te faire plaisir…`, `Plan B: keep ${m(keep)} to enjoy…`],
+    ['…et tu places le reste.', '…and invest the rest.'],
+    [`Hypothèse : ${pct(r)} par an, sans garantie.`, `Assumption: ${pct(r)} a year, not guaranteed.`],
+    [`Ça fait ${m(annual)} par an. Sans travailler.`, `That is ${m(annual)} a year. Without working.`],
+    [`Environ ${m(monthly)} par mois.`, `About ${m(monthly)} a month.`],
+    [`Sans y toucher pendant ${N} ans : environ ${m(fv)}.`, `Untouched for ${N} years: about ${m(fv)}.`],
+    [age ? `À ${age + N} ans, ton argent travaille pour toi.` : 'Ton argent travaille pour toi.', age ? `By ${age + N}, your money works for you.` : 'Your money works for you.'],
+    ['Mais l’inflation et les impôts prennent leur part.', 'But inflation and taxes take their share.'],
+  ]);
   beats.push(beat(final[c.style], d({ pose: 'idle', expr: 'determined', bg: 'spotlight', cam: 'push-in', props: [P('trophy', 'rise', 'top')], sfx: [S('ding', 'start')] }), [t('chance.', 'luck.'), t('décision.', 'decision.'), t('discipline', 'discipline')]));
 
   return {
@@ -227,6 +249,18 @@ function investMonthly(p: ParsedTopic, c: Ctx): ArchetypeOutput {
     facts: t('Ce n’est pas de la magie. C’est des mathématiques et de la patience.', 'It is not magic. It is math and patience.'),
     unexpected: t('Le plus gros contributeur à ta fortune, ce n’est pas toi. C’est le temps.', 'The biggest contributor to your wealth is not you. It is time.'),
   };
+  shorts(beats, c, [
+    [`${Pm} par mois. Regarde ce que ça devient en ${N} ans.`, `${Pm} a month. Watch what it becomes in ${N} years.`],
+    [`Chaque mois, tu mets ${Pm} de côté.`, `Every month, you set aside ${Pm}.`],
+    [`Après un an : ${m(P0 * 12)}. Rien de fou.`, `After a year: ${m(P0 * 12)}. Nothing crazy.`],
+    ['Mais tu investis cet argent.', 'But you invest that money.'],
+    [`Hypothèse : ${pct(r)} par an, sans garantie.`, `Assumption: ${pct(r)} a year, not guaranteed.`],
+    ['Les gains produisent des gains : les intérêts composés.', 'Gains earn more gains: compound interest.'],
+    [`${y1} ans : environ ${m(fv1)}.`, `${y1} years: about ${m(fv1)}.`],
+    [`${y2} ans : environ ${m(fv2)}.`, `${y2} years: about ${m(fv2)}.`],
+    [`${N} ans : environ ${m(fvN)}.`, `${N} years: about ${m(fvN)}.`],
+    [`Tu n’as versé que ${m(paid)}.`, `You only put in ${m(paid)}.`],
+  ]);
   beats.push(beat(final[c.style], d({ pose: 'idle', expr: 'determined', bg: 'spotlight', cam: 'push-in', props: [P('hourglass', 'rise', 'top')], sfx: [S('ding', 'start')] }), [t('temps.', 'time.'), t('régularité', 'consistency'), t('patience.', 'patience.')]));
   return {
     title: t(`Et si tu investissais ${Pm} par mois ?`, `What if you invested ${Pm} a month?`),
@@ -286,6 +320,18 @@ function habit(p: ParsedTopic, c: Ctx): ArchetypeOutput {
     beat(t(`En trente ans : environ ${m(fv30)}.`, `In thirty years: about ${m(fv30)}.`), d({ pose: 'celebrating', expr: 'excited', bg: 'spotlight', cam: 'zoom-in', tr: 'zoom-through', fx: 'money-rain', chart: { kind: 'bar', trend: 'up', values: Array.from({ length: 8 }, (_, i) => Math.round(futureValueMonthly(monthly, r, (30 * (i + 1)) / 8))) }, overlay: { text: m(fv30), style: 'number', counter: c.counter(fv30, roundFriendly(fv10)) }, sfx: [S('riser', 'start'), S('cash', 'end')] }), words(m(fv30))),
     beat(t('Est-ce qu’il faut tout arrêter ? Non. Il faut juste savoir ce que ça coûte vraiment.', 'Should you quit everything? No. You just need to know what it really costs.'), d({ pose: 'explaining', expr: 'smug', bg: 'floor', props: [P(prop, 'float', 'right')], sfx: [S('pop', 'start')] }), [t('vraiment.', 'really')], [t('Non.', 'No.')]),
   ];
+  shorts(beats, c, [
+    [`${name.charAt(0).toUpperCase() + name.slice(1)} coûte plus que ${dm}.`, `${name.charAt(0).toUpperCase() + name.slice(1)} costs more than ${dm}.`],
+    [`${dm} par jour. Calculons.`, `${dm} a day. Let's calculate.`],
+    [`Environ ${m(monthly)} par mois…`, `About ${m(monthly)} a month…`],
+    [`…et ${m(yearly)} par an.`, `…and ${m(yearly)} a year.`],
+    [`En dix ans : ${m(yearly * 10)}.`, `In ten years: ${m(yearly * 10)}.`],
+    ['Et si tu plaçais cet argent ?', 'What if you invested it instead?'],
+    [`Hypothèse : ${pct(r)} par an, sans garantie.`, `Assumption: ${pct(r)} a year, not guaranteed.`],
+    [`Dix ans : environ ${m(fv10)}.`, `Ten years: about ${m(fv10)}.`],
+    [`Trente ans : environ ${m(fv30)}.`, `Thirty years: about ${m(fv30)}.`],
+    ['Pas besoin de tout arrêter. Juste de savoir.', 'No need to quit. Just know the cost.'],
+  ]);
   beats.push(beat(t('Ce n’est pas la dépense qui coûte cher. C’est l’habitude.', 'It is not the purchase that is expensive. It is the habit.'), d({ pose: 'idle', expr: 'determined', bg: 'spotlight', cam: 'push-in', props: [P('hourglass', 'rise', 'top')], sfx: [S('ding', 'start')] }), [t('l’habitude.', 'habit.')]));
   return {
     title: t(`Combien te coûte vraiment ${name} ?`, `What does ${name} really cost you?`),
@@ -336,6 +382,18 @@ function debt(p: ParsedTopic, c: Ctx): ArchetypeOutput {
     beat(t(`Tu es libéré en ${yrs(fix.months)} ans, et tu économises environ ${m(saved)}.`, `You are debt-free in ${yrs(fix.months)} years, and you save about ${m(saved)}.`), d({ pose: 'celebrating', expr: 'excited', bg: 'floor', fx: 'confetti', props: [P('lock', 'spin', 'top-right')], overlay: { text: m(saved), style: 'number', counter: c.counter(saved) }, sfx: [S('ding', 'start')] }), [...words(m(saved)), yrs(fix.months), t('libéré', 'debt-free')]),
     beat(t('La différence ? Rembourser plus que ce que les intérêts ajoutent.', 'The difference? Paying more than the interest adds.'), d({ pose: 'explaining', expr: 'smug', pos: 'left', bg: 'grid', chart: { kind: 'line', trend: 'down', values: [100, 88, 75, 62, 48, 33, 18, 2] }, sfx: [S('pop', 'middle')] }), [t('plus', 'more')]),
   ];
+  shorts(beats, c, [
+    [`${Bm} sur ta carte. Tu paies le minimum.`, `${Bm} on your card. You pay the minimum.`],
+    [`Hypothèse : ${pct(apr)} par an.`, `Assumption: ${pct(apr)} a year.`],
+    [`Premier mois : ${m(mini.firstPayment)}. Gérable.`, `First month: ${m(mini.firstPayment)}. Manageable.`],
+    [`Dont ${m(mini.firstInterest)} d’intérêts.`, `${m(mini.firstInterest)} of it is interest.`],
+    ['La dette recule très lentement.', 'The debt shrinks very slowly.'],
+    [mini.paidOff ? `Environ ${yrs(mini.months)} ans pour rembourser.` : 'La dette ne disparaît presque jamais.', mini.paidOff ? `About ${yrs(mini.months)} years to pay off.` : 'The debt almost never goes away.'],
+    [`Et ${m(mini.totalInterest)} d’intérêts en plus.`, `And ${m(mini.totalInterest)} in extra interest.`],
+    [`Paie plutôt ${m(fixed)} fixes par mois.`, `Pay a fixed ${m(fixed)} a month instead.`],
+    [`Libéré en ${yrs(fix.months)} ans. Environ ${m(saved)} économisés.`, `Debt-free in ${yrs(fix.months)} years. About ${m(saved)} saved.`],
+    ['Rembourse plus que les intérêts.', 'Pay more than the interest adds.'],
+  ]);
   beats.push(beat(t('Une dette n’est pas juste un montant. C’est un compteur qui tourne.', 'Debt is not just a number. It is a meter that keeps running.'), d({ pose: 'idle', expr: 'determined', bg: 'spotlight', cam: 'push-in', props: [P('hourglass', 'rise', 'top')], sfx: [S('tick', 'start')] }), [t('compteur', 'meter')]));
   return {
     title: t(`${Bm} de dette : le piège du paiement minimum`, `${Bm} of debt: the minimum payment trap`),
@@ -375,6 +433,18 @@ function startEarly(p: ParsedTopic, c: Ctx): ArchetypeOutput {
     beat(t('Pourquoi ? Parce que les premiers euros investis ont le plus de temps pour grossir.', 'Why? Because the first money invested has the most time to grow.').replace('euros', c.cur === 'EUR' ? 'euros' : c.cur === 'USD' ? 'dollars' : 'livres'), d({ pose: 'explaining', expr: 'thinking', pos: 'left', bg: 'grid', chart: { kind: 'bar', trend: 'up', values: Array.from({ length: 8 }, (_, i) => Math.round(futureValueMonthly(P0, r, ((end - a1) * (i + 1)) / 8))) }, sfx: [S('riser', 'start')] }), [t('temps', 'time')]),
     beat(t('Chaque année d’attente coûte plus cher que la précédente.', 'Every year you wait costs more than the one before.'), d({ pose: 'thinking', expr: 'worried', bg: 'vignette', props: [P('clock', 'shake', 'top-right'), P('calendar', 'pop', 'top-left', { delay: 0.4 })], sfx: [S('tick', 'start')] }), [], [t('attente', 'wait')]),
   ];
+  shorts(beats, c, [
+    [`Deux amis. L’un commence à ${a1} ans, l’autre à ${a2} ans.`, `Two friends. One starts at ${a1}, the other at ${a2}.`],
+    [`Chacun place ${m(P0)} par mois.`, `Each invests ${m(P0)} a month.`],
+    [`Hypothèse : ${pct(r)} par an, sans garantie.`, `Assumption: ${pct(r)} a year, not guaranteed.`],
+    [`Le premier verse ${m(cA)}.`, `The first puts in ${m(cA)}.`],
+    [`Le second, ${m(cB)}.`, `The second, ${m(cB)}.`],
+    [`À ${end} ans, le premier a ${m(fvA)}.`, `At ${end}, the first has ${m(fvA)}.`],
+    [`Le second, ${m(fvB)}.`, `The second, ${m(fvB)}.`],
+    [`Environ ${ratio} fois plus.`, `About ${ratio} times more.`],
+    ['Les premiers euros ont le plus de temps pour grossir.', 'Early money has the most time to grow.'],
+    ['Chaque année d’attente coûte plus cher.', 'Every year you wait costs more.'],
+  ]);
   beats.push(beat(t('Le temps est le seul investissement qu’on ne peut pas rattraper.', 'Time is the one investment you can never catch up on.'), d({ pose: 'idle', expr: 'determined', bg: 'spotlight', cam: 'push-in', props: [P('hourglass', 'rise', 'top')], sfx: [S('ding', 'start')] }), [t('temps', 'Time')]));
   return {
     title: t(`Investir à ${a1} ans ou à ${a2} ans : la vraie différence`, `Investing at ${a1} vs ${a2}: the real difference`),

@@ -38,7 +38,7 @@ export interface ScriptValidation {
 }
 
 /** Content checks beyond the JSON schema. Errors trigger a regeneration with feedback. */
-export function validateScript(script: Script, req: ScriptRequest): ScriptValidation {
+export function validateScript(script: Script, req: ScriptRequest, opts: { lenientShort?: boolean } = {}): ScriptValidation {
   const errors: string[] = [];
   const warnings: string[] = [];
   const parsed = ScriptSchema.safeParse(script);
@@ -48,7 +48,10 @@ export function validateScript(script: Script, req: ScriptRequest): ScriptValida
   const lang = req.options.language;
   const words = script.scenes.reduce((n, s) => n + wordCount(s.narration), 0);
   const [min, max] = req.wordRange;
-  if (words < min * 0.7) errors.push(`Narration is too short (${words} words, target ${min}–${max}).`);
+  if (words < min * 0.7) {
+    if (opts.lenientShort) warnings.push(`The offline story engine wrote ${words} words (about ${Math.round(words / 2.6)} s of narration), shorter than the ${req.targetSeconds} s target. Configure an LLM provider in Settings for longer videos.`);
+    else errors.push(`Narration is too short (${words} words, target ${min}–${max}).`);
+  }
   else if (words > max * 1.3) errors.push(`Narration is too long (${words} words, target ${min}–${max}).`);
   else if (words < min || words > max) warnings.push(`Narration length ${words} words is outside the ideal ${min}–${max} range.`);
   if (script.language !== lang) errors.push(`Script language is ${script.language}, expected ${lang}.`);
@@ -87,7 +90,7 @@ export async function generateValidatedScript(provider: LLMProvider, req: Script
   let lastErrors: string[] = [];
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const script = await provider.generateScript(req, ctx, feedback);
-    const v = validateScript(script, req);
+    const v = validateScript(script, req, { lenientShort: provider.isLocal });
     if (v.errors.length === 0) return { script, warnings: v.warnings, attempts: attempt };
     ctx.log.warn(`Script validation failed (attempt ${attempt}):`, v.errors);
     lastErrors = v.errors;
