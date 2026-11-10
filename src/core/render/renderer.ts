@@ -6,7 +6,7 @@ import { QUALITY_CRF } from '../../shared/constants';
 import type { PlannedScene, VideoPlan } from '../../shared/schemas';
 import type { FFmpeg, ProbeResult } from '../media/ffmpeg';
 import { CancelledError, UserFacingError, throwIfAborted } from '../util/errors';
-import { ensureDir, exists, safeJoin, writeFileAtomic } from '../util/fsx';
+import { ensureDir, exists, renameWithRetry, safeJoin, writeFileAtomic } from '../util/fsx';
 import { hashOf } from '../util/hash';
 import { createLogger } from '../util/logger';
 
@@ -161,7 +161,7 @@ export async function renderSceneChunks(
     } finally {
       opts.signal?.removeEventListener('abort', onAbort);
     }
-    await fsp.rename(tmp, file);
+    await renameWithRetry(tmp, file);
     doneFrames += scene.durationInFrames;
     opts.onProgress?.({ ...base, sceneFraction: 1, framesDone: doneFrames, cached: false });
     log.info(`Scene ${scene.index + 1}/${plan.scenes.length} rendered (${scene.durationInFrames} frames)`);
@@ -204,7 +204,7 @@ export async function assembleFinal(
     ],
     { signal: opts.signal, onProgress: (s) => opts.onProgress?.(0.3 + 0.7 * Math.min(1, s / durationSec)) },
   );
-  await fsp.rename(tmp, output);
+  await renameWithRetry(tmp, output);
 }
 
 export interface Mp4Validation {

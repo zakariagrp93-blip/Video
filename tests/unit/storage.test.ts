@@ -111,3 +111,27 @@ describe('asset cache', () => {
     await expect(cache.get('../x', 'a', 'png')).rejects.toThrow();
   });
 });
+
+describe('atomic writes on Windows', () => {
+  it('retries a rename blocked by a transient lock (EPERM) and serialises writes to one file', async () => {
+    const { default: fsp } = await import('node:fs/promises');
+    const { vi } = await import('vitest');
+    const { writeFileAtomic } = await import('../../src/core/util/fsx');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fvs-eperm-'));
+    const file = path.join(dir, 'project.json');
+    const real = fsp.rename.bind(fsp);
+    let fails = 2;
+    const spy = vi.spyOn(fsp, 'rename').mockImplementation(async (a, b) => {
+      if (fails-- > 0) throw Object.assign(new Error('EPERM: operation not permitted, rename'), { code: 'EPERM' });
+      return real(a, b);
+    });
+    try {
+      await Promise.all([writeFileAtomic(file, '{"v":1}'), writeFileAtomic(file, '{"v":2}'), writeFileAtomic(file, '{"v":3}')]);
+      expect(spy).toHaveBeenCalledTimes(5); // 2 transient failures retried, then 3 renames
+      expect(fs.readFileSync(file, 'utf8')).toBe('{"v":3}');
+      expect(fs.readdirSync(dir).filter((f) => f.endsWith('.tmp'))).toEqual([]);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});

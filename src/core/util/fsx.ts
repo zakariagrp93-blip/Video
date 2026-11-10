@@ -32,12 +32,52 @@ export function safeJoin(root: string, ...segments: string[]): string {
   return target;
 }
 
+const TRANSIENT_FS = new Set(['EPERM', 'EACCES', 'EBUSY']);
+
+/**
+ * rename() that survives Windows' transient locks: replacing a file another handle is
+ * reading, or one antivirus / the search indexer is scanning, fails with EPERM/EACCES/EBUSY
+ * for a few milliseconds. Retry with backoff (≈ 6 s at most), as graceful-fs does.
+ */
+export async function renameWithRetry(from: string, to: string, sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))): Promise<void> {
+  let delay = 10;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await fsp.rename(from, to);
+      return;
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code ?? '';
+      if (!TRANSIENT_FS.has(code) || attempt >= 14) throw err;
+      await sleep(delay);
+      delay = Math.min(1000, delay * 2);
+    }
+  }
+}
+
+/** Writes to the same file are queued so two saves never race on the rename. */
+const writeQueues = new Map<string, Promise<void>>();
+
 /** Write a file atomically (temp file + rename) so a crash never leaves half-written JSON. */
 export async function writeFileAtomic(file: string, data: string | Uint8Array): Promise<void> {
-  await ensureDir(path.dirname(file));
-  const tmp = `${file}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp`;
-  await fsp.writeFile(tmp, data);
-  await fsp.rename(tmp, file);
+  const key = path.resolve(file);
+  const previous = writeQueues.get(key) ?? Promise.resolve();
+  const run = previous.catch(() => undefined).then(async () => {
+    await ensureDir(path.dirname(file));
+    const tmp = `${file}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp`;
+    await fsp.writeFile(tmp, data);
+    try {
+      await renameWithRetry(tmp, file);
+    } catch (err) {
+      await fsp.rm(tmp, { force: true }).catch(() => undefined);
+      throw err;
+    }
+  });
+  writeQueues.set(key, run);
+  try {
+    await run;
+  } finally {
+    if (writeQueues.get(key) === run) writeQueues.delete(key);
+  }
 }
 
 export async function writeJson(file: string, value: unknown): Promise<void> {
