@@ -51,8 +51,8 @@ export class AnthropicLLMProvider extends RemoteLLMProvider {
         ...(req.images ?? []).map((im) => ({ type: 'image' as const, source: { type: 'base64' as const, media_type: im.mediaType, data: im.data.toString('base64') } })),
         { type: 'text' as const, text: req.prompt },
       ];
-      const response = await this.client()
-        .beta.messages.stream(
+      req.onProgress?.({ phase: 'connecting', chars: 0 });
+      const stream = this.client().beta.messages.stream(
           {
             model: this.model,
             max_tokens: 64000,
@@ -63,9 +63,27 @@ export class AnthropicLLMProvider extends RemoteLLMProvider {
             messages: [{ role: 'user', content }],
             output_config: { effort: 'high' },
           },
-          { signal: ctx.signal },
-        )
-        .finalMessage();
+          // A full shot list can take 10+ minutes to write: don't let the client time out mid-answer.
+          { signal: ctx.signal, timeout: 40 * 60 * 1000 },
+        );
+      let chars = 0;
+      let last = 0;
+      const tick = (phase: 'thinking' | 'writing') => {
+        const now = Date.now();
+        if (now - last > 800) {
+          last = now;
+          req.onProgress?.({ phase, chars });
+        }
+      };
+      stream.on('streamEvent', (ev) => {
+        if (ev.type === 'content_block_start' && ev.content_block.type === 'thinking') tick('thinking');
+        if (ev.type === 'content_block_delta' && ev.delta.type !== 'text_delta') tick('thinking');
+      });
+      stream.on('text', (delta) => {
+        chars += delta.length;
+        tick('writing');
+      });
+      const response = await stream.finalMessage();
       ctx.usage({
         provider: 'anthropic',
         kind: 'llm',

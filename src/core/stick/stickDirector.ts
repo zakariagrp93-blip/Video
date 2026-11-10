@@ -158,13 +158,29 @@ export interface StickWriteResult {
  * renders without errors is always kept, so a failed review never loses a working reel.
  */
 export async function writeStickShots(script: Script, timing: StickTiming, deps: StickWriterDeps, ctx: ProviderContext, maxCalls = 4): Promise<StickWriteResult> {
-  const base: TextRequest = { name: 'stick-shots', system: STICK_SHOTS_SYSTEM, prompt: stickShotsPrompt(script, timing) };
+  // Live status while a long answer streams, e.g. "Claude is writing the animation… 12 400 characters (2:31)".
+  let label = 'Claude is writing the animation';
+  let at = 0.05;
+  let t0 = Date.now();
+  const clock = () => {
+    const s = Math.round((Date.now() - t0) / 1000);
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  };
+  const onProgress: TextRequest['onProgress'] = (p) =>
+    deps.report(at, p.phase === 'writing' ? `${label}… ${p.chars.toLocaleString('fr-FR')} characters written (${clock()})` : p.phase === 'thinking' ? `${label}… thinking (${clock()})` : `${label}… connecting`);
+  const phase = (l: string, a: number) => {
+    label = l;
+    at = a;
+    t0 = Date.now();
+  };
+  const base: TextRequest = { name: 'stick-shots', system: STICK_SHOTS_SYSTEM, prompt: stickShotsPrompt(script, timing), onProgress };
   let calls = 0;
   let rounds = 0;
   let working: string | null = null;
   let sheet: { sheet: Buffer; times: number[] } | null = null;
 
-  deps.report(0.05, 'Claude is writing the animation (a few minutes)…');
+  phase('Claude is writing the animation', 0.05);
+  deps.report(0.05, 'Claude is writing the animation (usually 3–10 minutes)…');
   let text = await deps.writeText(base, ctx, true);
   calls++;
   let code = extractCode(text);
@@ -189,7 +205,8 @@ export async function writeStickShots(script: Script, timing: StickTiming, deps:
       }
     }
     if (calls >= maxCalls) break;
-    deps.report(0.4 + 0.1 * rounds, 'Claude is fixing the animation…');
+    phase('Claude is fixing the animation', 0.4 + 0.1 * rounds);
+    deps.report(at, 'Claude is fixing the animation…');
     text = await deps.writeText({ ...base, prompt: `${base.prompt}\n\nYour previous shot list:\n\`\`\`js\n${code ?? text.slice(0, 20000)}\n\`\`\`\n\nIt was rejected: ${feedback}\nReturn the complete corrected shot list as one \`\`\`js block.` }, ctx, false);
     calls++;
     code = extractCode(text);
@@ -198,7 +215,8 @@ export async function writeStickShots(script: Script, timing: StickTiming, deps:
 
   // Visual review: the model looks at a contact sheet of its own frames once.
   if (calls < maxCalls) {
-    deps.report(0.7, 'Claude is reviewing the frames…');
+    phase('Claude is reviewing the frames', 0.7);
+    deps.report(at, 'Claude is reviewing the frames…');
     const review = await deps.writeText(
       {
         ...base,
