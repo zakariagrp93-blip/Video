@@ -1,5 +1,6 @@
 import { DEFAULT_THEME, MOTIFS, POSES, PROP_ASSETS, VIDEO_FPS, VIDEO_HEIGHT, VIDEO_WIDTH, type Expression } from '../shared/constants';
 import type { PlannedScene, VideoPlan } from '../shared/schemas';
+import { DEMO_STICK_SHOTS } from './stick/demoShots';
 
 const EXPR: Record<string, Expression> = {
   idle: 'neutral',
@@ -114,5 +115,24 @@ export function sampleEditPlan(sceneSeconds = 2.4): VideoPlan {
       };
     }),
     images: {},
+  };
+}
+
+/** Demo stick-figure explainer (hand-written shots in the format Claude produces). */
+export function sampleStickPlan(seconds = 9, strict = false): VideoPlan {
+  const dur = Math.round(seconds * VIDEO_FPS);
+  const base = sampleEditPlan(seconds / 3);
+  const scenes = base.scenes.slice(0, 3).map((s, i) => ({ ...s, motif: undefined, index: i, startFrame: Math.round((i * dur) / 3), durationInFrames: Math.round(((i + 1) * dur) / 3) - Math.round((i * dur) / 3) }));
+  const words = ['cinq euros', 'par jour', 'ça fait combien'];
+  return {
+    ...base,
+    title: 'Stick-figure demo',
+    mode: 'stick',
+    captionMode: 'karaoke',
+    beat: undefined,
+    durationInFrames: dur,
+    scenes,
+    captions: scenes.map((s, i) => ({ startFrame: s.startFrame + 6, endFrame: s.startFrame + s.durationInFrames - 6, words: [{ text: words[i]!, startFrame: s.startFrame + 6, endFrame: s.startFrame + 30, tone: 'normal' as const }] })),
+    stick: { code: DEMO_STICK_SHOTS, strict },
   };
 }

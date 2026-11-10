@@ -5,7 +5,7 @@ export interface TimelineOptions {
   fps?: number;
   layout?: 'cinema' | 'tall';
   captionMode?: 'sentence' | 'karaoke' | 'kinetic';
-  mode?: 'story' | 'edit';
+  mode?: 'story' | 'edit' | 'stick';
   /** Music beat grid; scene cuts snap to it (motivation edits). */
   beat?: { bpm: number; offset: number; dropAt: number };
   snap?: (sec: number) => number;
@@ -68,7 +68,7 @@ export function buildVideoPlan(storyboard: Storyboard, narration: NarrationManif
     banner: opts.banner ? opts.banner.slice(0, 140) : undefined,
     iconTone: opts.iconTone ?? 'color',
     ...(opts.chartStyle ? { chartStyle: opts.chartStyle } : {}),
-    ...(opts.mode === 'edit' ? { mode: 'edit' as const, beat: opts.beat } : {}),
+    ...(opts.mode === 'edit' ? { mode: 'edit' as const, beat: opts.beat } : opts.mode === 'stick' ? { mode: 'stick' as const } : {}),
     scenes,
     captions,
     images: opts.images ?? {},
@@ -86,6 +86,8 @@ const EFFECT_SFX: Partial<Record<string, SfxType>> = {
 /** Derive the sound-effect timeline from the plan (scene SFX, transitions, effects). */
 export function buildSfxTimeline(plan: VideoPlan): SfxEvent[] {
   if (plan.mode === 'edit') return buildEditSfx(plan);
+  // Stick explainers: a soft whoosh into each new scene (most scene changes are whips).
+  if (plan.mode === 'stick') return plan.scenes.filter((s) => s.index > 0).map((s) => ({ type: 'whoosh' as const, time: Math.max(0, s.startFrame / plan.fps - 0.15), gain: 0.3 }));
   const events: SfxEvent[] = [];
   const sec = (f: number) => f / plan.fps;
   for (const sc of plan.scenes) {

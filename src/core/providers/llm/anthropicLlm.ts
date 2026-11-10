@@ -4,7 +4,7 @@ import type { z } from 'zod';
 import { ProviderError } from '../../util/errors';
 import { getFetchImplementation } from '../../util/http';
 import type { ConnectionTestResult, ProviderContext } from '../types';
-import { RemoteLLMProvider, type JsonRequest } from './remoteLlm';
+import { RemoteLLMProvider, type JsonRequest, type TextRequest } from './remoteLlm';
 
 /**
  * Claude via the official Anthropic SDK, using structured outputs so every
@@ -42,6 +42,56 @@ export class AnthropicLLMProvider extends RemoteLLMProvider {
       if (err instanceof Anthropic.APIError) return { ok: false, message: `API error ${err.status}: ${err.message}` };
       return { ok: false, message: (err as Error).message };
     }
+  }
+
+  /** Long outputs (generated shot code) are streamed so the request never hits an HTTP timeout. */
+  protected async completeText(req: TextRequest, ctx: ProviderContext): Promise<string> {
+    try {
+      const content: Anthropic.Beta.BetaContentBlockParam[] = [
+        ...(req.images ?? []).map((im) => ({ type: 'image' as const, source: { type: 'base64' as const, media_type: im.mediaType, data: im.data.toString('base64') } })),
+        { type: 'text' as const, text: req.prompt },
+      ];
+      const response = await this.client()
+        .beta.messages.stream(
+          {
+            model: this.model,
+            max_tokens: 64000,
+            betas: ['server-side-fallback-2026-07-01'],
+            fallbacks: 'default',
+            // The engine reference is large and identical for every video: cache it.
+            system: [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }],
+            messages: [{ role: 'user', content }],
+            output_config: { effort: 'high' },
+          },
+          { signal: ctx.signal },
+        )
+        .finalMessage();
+      ctx.usage({
+        provider: 'anthropic',
+        kind: 'llm',
+        model: response.model,
+        units: response.usage.input_tokens + response.usage.output_tokens,
+        unitType: 'tokens',
+        // Cached reads cost ~0.1x, cache writes ~1.25x: fold them into billable input tokens.
+        inputTokens: Math.round(response.usage.input_tokens + (response.usage.cache_read_input_tokens ?? 0) * 0.1 + (response.usage.cache_creation_input_tokens ?? 0) * 1.25),
+        outputTokens: response.usage.output_tokens,
+      });
+      if (response.stop_reason === 'refusal') throw new ProviderError('anthropic', 'The model declined this request. Try rephrasing the topic.', undefined, false);
+      if (response.stop_reason === 'max_tokens') throw new ProviderError('anthropic', `Response for ${req.name} was truncated (max_tokens).`, undefined, true);
+      return response.content.map((b) => (b.type === 'text' ? b.text : '')).join('');
+    } catch (err) {
+      throw this.mapError(err);
+    }
+  }
+
+  private mapError(err: unknown): unknown {
+    if (err instanceof ProviderError) return err;
+    if (err instanceof Anthropic.AuthenticationError) return new ProviderError('anthropic', 'Invalid API key.', 401, false);
+    if (err instanceof Anthropic.RateLimitError) return new ProviderError('anthropic', 'Rate limited.', 429, true);
+    if (err instanceof Anthropic.BadRequestError) return new ProviderError('anthropic', `Bad request: ${err.message}`, 400, false);
+    if (err instanceof Anthropic.APIError) return new ProviderError('anthropic', err.message, err.status, (err.status ?? 0) >= 500);
+    if (err instanceof Anthropic.APIConnectionError) return new ProviderError('anthropic', 'Network error contacting the API.', undefined, true);
+    return err;
   }
 
   protected async completeJson<S extends z.ZodType>(req: JsonRequest<S>, ctx: ProviderContext): Promise<z.infer<S>> {

@@ -36,11 +36,12 @@ export const STORYTELLING_LABELS: Record<StorytellingStyle, string> = {
 };
 
 /** Content families. Each one has its own writer, art direction, music and captions. */
-export const CATEGORIES = ['finance', 'motivation'] as const;
+export const CATEGORIES = ['finance', 'motivation', 'stickfigure'] as const;
 export type Category = (typeof CATEGORIES)[number];
 export const CATEGORY_LABELS: Record<Category, string> = {
   finance: 'Finance story (mascot)',
   motivation: 'Motivation edit (money, discipline, mindset)',
+  stickfigure: 'Stick-figure explainer (Claude animates it)',
 };
 
 /** Music for motivation edits. */

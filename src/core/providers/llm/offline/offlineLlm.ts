@@ -42,6 +42,9 @@ export class OfflineLLMProvider implements LLMProvider {
 
   checkReady(options?: GenerationOptions): string | null {
     if (!options) return null;
+    if (options.category === 'stickfigure') {
+      return 'Stick-figure explainers are written and animated by Claude: add an Anthropic API key (Settings → API keys) and choose Anthropic Claude as the script provider (Settings → AI providers).';
+    }
     if (options.category === 'motivation') {
       return isMotivationLanguage(options.language) ? null : 'The offline engine writes motivation edits in French and English only. Configure an LLM provider (Settings → AI providers) for Spanish or German.';
     }

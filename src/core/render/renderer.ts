@@ -258,6 +258,36 @@ export async function renderStillFrame(plan: VideoPlan, frame: number, out: stri
   await R.renderStill({ composition, serveUrl: env.serveUrl, output: out, frame, inputProps, imageFormat: 'png', overwrite: true, ...common });
 }
 
+/**
+ * Render several stills of one plan with a single browser (used to check generated
+ * stick-figure shots). Errors thrown by the composition — e.g. a shot that fails in strict
+ * mode — propagate with the frame number.
+ */
+export async function renderStills(plan: VideoPlan, frames: number[], outDir: string, env: Pick<RenderEnvironment, 'serveUrl' | 'browserExecutable' | 'binariesDirectory'>, scale = 0.25): Promise<string[]> {
+  assertBrowserExecutable(env.browserExecutable);
+  const R = await loadRenderer();
+  await ensureDir(outDir);
+  const inputProps = { plan };
+  const browser = await R.openBrowser('chrome', { browserExecutable: env.browserExecutable || null, logLevel: 'error' });
+  const common = { browserExecutable: env.browserExecutable || null, binariesDirectory: env.binariesDirectory || null, logLevel: 'error' as const, puppeteerInstance: browser };
+  try {
+    const composition = await R.selectComposition({ serveUrl: env.serveUrl, id: COMPOSITION_ID, inputProps, ...common });
+    const files: string[] = [];
+    for (const frame of frames) {
+      const out = path.join(outDir, `still-${String(frame).padStart(5, '0')}.png`);
+      try {
+        await R.renderStill({ composition, serveUrl: env.serveUrl, output: out, frame, inputProps, imageFormat: 'png', overwrite: true, scale, ...common });
+      } catch (err) {
+        throw new Error(`Frame ${frame} (${(frame / plan.fps).toFixed(2)} s): ${(err as Error).message.split('\n')[0]}`);
+      }
+      files.push(out);
+    }
+    return files;
+  } finally {
+    await browser.close({ silent: true }).catch(() => undefined);
+  }
+}
+
 /** Rasterise the mascot reference sheet (used by image providers that accept reference images). */
 export async function renderCharacterSheet(out: string, env: Pick<RenderEnvironment, 'serveUrl' | 'browserExecutable' | 'binariesDirectory'>): Promise<void> {
   assertBrowserExecutable(env.browserExecutable);

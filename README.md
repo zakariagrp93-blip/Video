@@ -70,7 +70,7 @@ npm run studio
 | Screen | Features |
 |---|---|
 | **Dashboard** | Logo, *Create a video*, recent projects, completed videos, failed generations with one-click retry, generation history, total videos, storage used, estimated API spend |
-| **Video generator** | Category (**Finance story** with the mascot, or **Motivation edit**: money, discipline, success, mindset), topic, duration (30/45/60/90 s/auto), language (FR/EN/ES/DE), narrator (male/female/auto), storytelling mode, visual style (Finance-Lite-inspired / custom brand), fully automatic mode. A live pre-flight check tells you *before* generating if a provider can't handle the request. |
+| **Video generator** | Category (**Finance story** with the mascot, **Motivation edit**: money, discipline, success, mindset, or **Stick-figure explainer** animated by Claude), topic, duration (30/45/60/90 s/auto), language (FR/EN/ES/DE), narrator (male/female/auto), storytelling mode, visual style (Finance-Lite-inspired / custom brand), fully automatic mode. A live pre-flight check tells you *before* generating if a provider can't handle the request. |
 | **Generation progress** | The 8 real pipeline stages, current stage, %, current scene, ETA (measured from real render throughput), warnings, errors, **Retry** (resumes from the failed stage), **Cancel** |
 | **Video library** | Thumbnail, title, date, duration, file size, status. Play, open file location, regenerate (everything / voice / sound / re-render only), duplicate, delete |
 | **Settings** | LLM, image and TTS providers and models; API keys (encrypted with Windows DPAPI via Electron `safeStorage`, never sent to the UI or logs); voice selection and download; default duration and language; export quality; output folder; brand colours; music, SFX and narration volume; render concurrency; FFmpeg and Chrome paths; cache size and clearing; pricing for cost estimates; system information |
@@ -82,6 +82,19 @@ npm run studio
 - **Animation library** (`src/remotion/anim.ts`) with one set of easing curves: pop, fade, float, fall, slide, rise, grow, shake, spin, pulse; camera zoom, pan, push-in, tilt and shake; character enter, exit, walk-across, jump, bounce, shiver and lean-in; scene transitions; money rain, coin burst, sparkles, impact, confetti, smoke and speed lines; animated line and bar charts; number counters.
 - **Charts**: *Minimal* by default (adapted from claude-animation-skills `/graph`, MIT): one white line drawing itself through the values, a tip dot, a landing ring and a dotted drop; outlined bars for bar charts. *Classic* keeps the boxed, coloured chart (Settings → Chart style).
 - **Captions**: karaoke-style, 1–3 words per cue, white with automatic yellow emphasis (numbers, key words) and red for losses and risks. They sit in the TikTok-safe band, below the mascot's feet and clear of the platform UI and right-side buttons.
+
+### Stick-figure explainers (Claude animates each video)
+
+Pick **Stick-figure explainer** in the generator (needs Claude — Anthropic API key, script provider *Anthropic Claude*; OpenAI works too):
+
+1. Claude writes a "what if" explainer script (one idea per sentence, hedged facts).
+2. The app records the voice and measures every word's timing, as for any video.
+3. Claude writes the **shot list as JavaScript** against a stick-figure canvas engine vendored from [claude-animation-skills](https://github.com/artemnovitckii/claude-animation-skills) (MIT): stick people with expressive faces and poses, bright cartoon world, props drawn with primitives, camera drift, impact bursts. The full engine source and an example reel are its reference (prompt-cached).
+4. The app checks the code (pure drawing code only — a deny-list rejects network, DOM and dynamic-code access; it runs only in the headless render browser, in a strict scope with browser globals shadowed), renders sample frames in strict mode and sends any error back to Claude to fix.
+5. Claude reviews a contact sheet of its own frames (safe area, caption band, does each frame match the voice?) and corrects the code once more if needed. At most 4 model calls; a working version is never thrown away.
+6. Render: whip transitions with motion blur, vignette, grain, lowercase 1–3 word captions, music and SFX, export.
+
+Typical cost with Claude Opus 5.5: about $1–3 per video (shown in the project's cost). Code: `src/core/stick/stickDirector.ts`, `src/shared/stick.ts`, `src/remotion/stick/`, engine in `vendor/stick-engine/` (regenerate with `node scripts/gen-stick-engine.mjs`).
 
 ### Motivation edits
 

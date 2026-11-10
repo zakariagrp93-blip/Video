@@ -18,6 +18,8 @@ import {
 import { EDIT_GAPS, buildNarration } from '../audio/narration';
 import { beatGrid, generateEditMusic, snapToGrid, type EditStyle } from '../audio/editMusic';
 import { detectTheme, motivationStoryboard } from '../motivation/motivation';
+import { stickStoryboard, stickTiming, writeStickShots, type StickWriteResult } from '../stick/stickDirector';
+import { RemoteLLMProvider } from '../providers/llm/remoteLlm';
 import { mixAudio } from '../audio/mixer';
 import { generateMusic, seedFrom } from '../audio/synth';
 import { encodeWav } from '../audio/wav';
@@ -26,7 +28,7 @@ import { importCustomIcons } from '../characters/customIcons';
 import { projectPaths, type ProjectPaths } from '../projects/projectStore';
 import type { ProviderContext } from '../providers/types';
 import { startAssetServer } from '../render/assetServer';
-import { assembleFinal, ensureRenderBrowser, extractThumbnail, renderCharacterSheet, renderSceneChunks, validateMp4 } from '../render/renderer';
+import { assembleFinal, ensureRenderBrowser, extractThumbnail, renderCharacterSheet, renderSceneChunks, renderStills, validateMp4 } from '../render/renderer';
 import { EDIT_SPEED, buildScriptRequest, generateValidatedScript } from '../script/scriptEngine';
 import { generateValidatedStoryboard } from '../storyboard/storyboardEngine';
 import type { Studio } from '../studio';
@@ -256,6 +258,12 @@ export class GenerationPipeline {
     const script = ScriptSchema.parse(await readJson(s.paths.scriptJson));
     const req = buildScriptRequest(s.project.options, settings.speakingSpeed);
     s.report(0.1, 'Directing scenes…');
+    if (s.project.options.category === 'stickfigure') {
+      // Directed later, by the shot code written in the animation stage.
+      const storyboard = StoryboardSchema.parse(stickStoryboard(script));
+      await writeJson(s.paths.storyboardJson, storyboard);
+      return `${storyboard.scenes.length} scenes (the animation is written after the voice, on its exact timing)`;
+    }
     if (s.project.options.category === 'motivation') {
       // Edits are directed deterministically from the shot notes (no LLM call, no cost).
       const storyboard = StoryboardSchema.parse(motivationStoryboard(script));
@@ -360,7 +368,8 @@ export class GenerationPipeline {
     const grid = editStyle ? beatGrid(editStyle, seed, Math.max(0.5, (second?.start ?? 2) - CUT_LEAD)) : null;
     const snap = grid ? (t: number) => snapToGrid(t, grid) : undefined;
     const { scenes, durationInFrames } = planScenes(sb, narration, VIDEO_FPS, snap);
-    const cinematic = !edit && s.project.options.visualStyle !== 'full-frame';
+    const stick = s.project.options.category === 'stickfigure';
+    const cinematic = !edit && !stick && s.project.options.visualStyle !== 'full-frame';
     const script = ScriptSchema.parse(await readJson(s.paths.scriptJson));
     const draft = buildVideoPlan(sb, narration, [], {
       // Edits show the brand tag only when a brand name is set; their colours stay black and gold.
@@ -371,10 +380,16 @@ export class GenerationPipeline {
       banner: cinematic ? script.title : undefined,
       iconTone: settings.iconTone,
       chartStyle: settings.chartStyle,
-      mode: edit ? 'edit' : 'story',
+      mode: edit ? 'edit' : stick ? 'stick' : 'story',
       beat: grid ?? undefined,
       snap,
     });
+    let stickNote = '';
+    if (stick) {
+      const res = await this.writeStickAnimation(s, script, draft, narration);
+      draft.stick = { code: res.code };
+      stickNote = `, animation by ${this.studio.providers.currentLlm().label} (${res.rounds} round${res.rounds > 1 ? 's' : ''}${res.reviewed ? ', frames reviewed' : ''})`;
+    }
     await writeJson(path.join(s.paths.renderDir, 'timeline.draft.json'), draft);
 
     s.report(0.3, 'Composing music…');
@@ -413,7 +428,53 @@ export class GenerationPipeline {
     const mix = await mixAudio(audioPlan, path.join(s.paths.audioDir, 'mix.wav'));
     await writeJson(path.join(s.paths.audioDir, 'audio-plan.json'), audioPlan);
     await writeJson(path.join(s.paths.renderDir, 'timeline.json'), { durationInFrames, scenes: scenes.map((x) => ({ id: x.id, startFrame: x.startFrame, durationInFrames: x.durationInFrames })) });
-    return `${scenes.length} scenes over ${durationSec.toFixed(1)} s, ${audioPlan.sfx.length} sound effects, music ${settings.musicEnabled ? 'on' : 'off'} (peak ${mix.peak.toFixed(2)})`;
+    return `${scenes.length} scenes over ${durationSec.toFixed(1)} s, ${audioPlan.sfx.length} sound effects, music ${settings.musicEnabled ? 'on' : 'off'} (peak ${mix.peak.toFixed(2)})${stickNote}`;
+  }
+
+  /**
+   * Stick-figure explainers: the LLM writes the shot code, the app renders sample frames in
+   * strict mode (errors go back to the model), then the model reviews a contact sheet.
+   */
+  private async writeStickAnimation(s: StageContext, script: Script, draft: VideoPlan, narration: NarrationManifest): Promise<StickWriteResult> {
+    const llm = this.studio.providers.currentLlm();
+    if (!(llm instanceof RemoteLLMProvider)) {
+      throw new UserFacingError('Stick-figure explainers need Claude (or OpenAI) to write the animation: set an API key and choose it as the script provider in Settings.', false);
+    }
+    const env = this.studio.renderEnv();
+    if (!env.browserExecutable) await ensureRenderBrowser(null, (f) => s.report(0.02, `Downloading renderer browser (one-time)… ${Math.round(f * 100)}%`));
+    const timing = stickTiming(draft.scenes, narration, draft.fps, draft.durationInFrames, script);
+    const checkDir = path.join(s.paths.renderDir, 'stick-check');
+    const ffmpeg = this.studio.ffmpeg();
+    // Sample frames: two per scene (early and late), at most 24, spread over the video.
+    const frames = [...new Set(draft.scenes.flatMap((sc) => [0.22, 0.72].map((f) => Math.min(draft.durationInFrames - 1, sc.startFrame + Math.round(sc.durationInFrames * f)))))].sort((a, b) => a - b);
+    const sample = frames.length > 24 ? frames.filter((_, i) => i % Math.ceil(frames.length / 24) === 0) : frames;
+    const test = async (code: string): Promise<{ error: string } | { sheet: Buffer; times: number[] }> => {
+      await fsp.rm(checkDir, { recursive: true, force: true });
+      try {
+        const files = await renderStills({ ...draft, stick: { code, strict: true } }, sample, checkDir, env, 0.25);
+        for (let i = 0; i < files.length; i++) await fsp.rename(files[i]!, path.join(checkDir, `sheet-${String(i).padStart(3, '0')}.png`));
+        const cols = Math.min(6, files.length);
+        const rows = Math.ceil(files.length / cols);
+        const sheetFile = path.join(checkDir, 'sheet.jpg');
+        await ffmpeg.run(['-y', '-v', 'error', '-i', path.join(checkDir, 'sheet-%03d.png'), '-vf', `tile=${cols}x${rows}:padding=6:color=black`, '-frames:v', '1', '-q:v', '4', sheetFile]);
+        return { sheet: await fsp.readFile(sheetFile), times: sample.map((f) => f / draft.fps) };
+      } catch (err) {
+        return { error: errorMessage(err).slice(0, 1500) };
+      }
+    };
+    const res = await writeStickShots(
+      script,
+      timing,
+      {
+        writeText: (req, ctx, useCache) => llm.writeText(req, ctx, useCache),
+        test,
+        report: (f, m) => s.report(0.05 + 0.2 * f, m),
+        warn: s.warn,
+      },
+      s.ctx,
+    );
+    await writeFileAtomic(path.join(s.paths.renderDir, 'shots.js'), res.code);
+    return res;
   }
 
   private async stageSubtitles(s: StageContext): Promise<string> {

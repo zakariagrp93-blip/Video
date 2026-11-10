@@ -267,7 +267,9 @@ export const VideoPlanSchema = z.object({
   layout: z.enum(['cinema', 'tall']).default('tall'),
   captionMode: z.enum(['sentence', 'karaoke', 'kinetic']).default('karaoke'),
   /** 'story' = mascot scenes; 'edit' = motivation edit (full-frame motifs + kinetic typography). */
-  mode: z.enum(['story', 'edit']).optional(),
+  mode: z.enum(['story', 'edit', 'stick']).optional(),
+  /** Stick-figure explainers: the shot list Claude wrote for this video (see src/shared/stick.ts). */
+  stick: z.object({ code: z.string().min(1).max(300_000), strict: z.boolean().optional() }).optional(),
   /** Music beat grid (seconds) so cuts and pulses land on the beat. */
   beat: z.object({ bpm: z.number().positive(), offset: z.number(), dropAt: z.number().min(0) }).optional(),
   /** Persistent title banner (the video's hook question) in the cinematic layout. */

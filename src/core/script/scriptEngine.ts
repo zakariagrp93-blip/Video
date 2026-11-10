@@ -18,7 +18,7 @@ export function buildScriptRequest(options: GenerationOptions, speed = 1): Scrip
   // motivation edits are read slower, with long dramatic pauses.
   const edit = options.category === 'motivation';
   const wps = WORDS_PER_SECOND[options.language] * speed * (edit ? EDIT_SPEED : 1);
-  const ideal = targetSeconds * (edit ? 0.7 : 0.88) * wps;
+  const ideal = targetSeconds * (edit ? 0.7 : options.category === 'stickfigure' ? 0.9 : 0.88) * wps;
   return { options, targetSeconds, wordRange: [Math.round(ideal * 0.8), Math.round(ideal * 1.15)] };
 }
 

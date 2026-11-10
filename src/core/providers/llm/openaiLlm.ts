@@ -4,7 +4,7 @@ import type { z } from 'zod';
 import { ProviderError } from '../../util/errors';
 import { getFetchImplementation } from '../../util/http';
 import type { ConnectionTestResult, ProviderContext } from '../types';
-import { RemoteLLMProvider, type JsonRequest } from './remoteLlm';
+import { RemoteLLMProvider, type JsonRequest, type TextRequest } from './remoteLlm';
 
 /** OpenAI via the official SDK (Responses API with structured outputs). */
 export class OpenAILLMProvider extends RemoteLLMProvider {
@@ -35,6 +35,34 @@ export class OpenAILLMProvider extends RemoteLLMProvider {
       return { ok: true, message: `Connected. Model ${m.id} is available.` };
     } catch (err) {
       return { ok: false, message: (err as Error).message };
+    }
+  }
+
+  protected async completeText(req: TextRequest, ctx: ProviderContext): Promise<string> {
+    try {
+      const response = await this.client().responses.create(
+        {
+          model: this.model,
+          instructions: req.system,
+          input: [
+            {
+              role: 'user',
+              content: [
+                ...(req.images ?? []).map((im) => ({ type: 'input_image' as const, image_url: `data:${im.mediaType};base64,${im.data.toString('base64')}`, detail: 'high' as const })),
+                { type: 'input_text' as const, text: req.prompt },
+              ],
+            },
+          ],
+        },
+        { signal: ctx.signal },
+      );
+      const usage = response.usage;
+      ctx.usage({ provider: 'openai', kind: 'llm', model: this.model, units: (usage?.input_tokens ?? 0) + (usage?.output_tokens ?? 0), unitType: 'tokens', inputTokens: usage?.input_tokens, outputTokens: usage?.output_tokens });
+      return response.output_text;
+    } catch (err) {
+      if (err instanceof ProviderError) throw err;
+      const status = (err as { status?: number }).status;
+      throw new ProviderError('openai', (err as Error).message, status, status === 429 || (status ?? 0) >= 500 || status === undefined);
     }
   }
 

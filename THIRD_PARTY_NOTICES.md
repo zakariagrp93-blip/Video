@@ -21,7 +21,10 @@ license.
 
 ## claude-animation-skills (animation styles)
 
-The minimal self-drawing graph (`MinimalGraphView` in `src/remotion/Chart.tsx`) and the minimal
+The stick-figure engine (`vendor/stick-engine/lib.js`, `chars.js`, `env.js`, `example-shots.js`,
+embedded in `src/shared/stickEngine.generated.ts`) and the compositor in
+`src/remotion/stick/StickVideo.tsx` (whip transitions, vignette, grain) come from the `/stick-figure`
+skill of the same repository. The minimal self-drawing graph (`MinimalGraphView` in `src/remotion/Chart.tsx`) and the minimal
 "steps" shot of motivation edits (`src/remotion/edit/motifs.tsx`) re-implement, in Remotion, the
 look and timing of the `/graph` and `/minimalistic-graphics` skills from
 https://github.com/artemnovitckii/claude-animation-skills.

@@ -31,6 +31,11 @@ const MOTIVATION_EXAMPLES: Record<'fr' | 'en', string[]> = {
   en: ['Money motivation: nobody is coming to make you rich', 'Discipline: up at 5 a.m. while they sleep', 'Success: they laughed at your dream', 'Mindset: your biggest enemy is your own head'],
 };
 
+const STICK_EXAMPLES: Record<'fr' | 'en', string[]> = {
+  fr: ['Et si tu épargnais 5 € par jour pendant 10 ans ?', 'Pourquoi les riches empruntent au lieu de vendre', 'Comment un café par jour te coûte une voiture', 'Et si tout le monde arrêtait de payer en liquide ?'],
+  en: ['What if you saved $5 a day for 10 years?', 'Why the rich borrow instead of selling', 'How a daily coffee costs you a car', 'What if everyone stopped using cash?'],
+};
+
 const EXAMPLES = [
   'What if you received €1 million at age 18?',
   'What if you invested €200 a month for 30 years?',
@@ -67,7 +72,8 @@ export function Generator({ navigate }: { navigate: Navigate }) {
     [topic, duration, language, narrator, storytelling, visualStyle, category, editMusic],
   );
   const motivation = category === 'motivation';
-  const examples = motivation ? MOTIVATION_EXAMPLES[language === 'en' ? 'en' : 'fr'] : EXAMPLES;
+  const stick = category === 'stickfigure';
+  const examples = motivation ? MOTIVATION_EXAMPLES[language === 'en' ? 'en' : 'fr'] : stick ? STICK_EXAMPLES[language === 'en' ? 'en' : 'fr'] : EXAMPLES;
 
   // Live preflight: tells the user *before* generating if a provider cannot handle the request.
   useEffect(() => {
@@ -105,7 +111,16 @@ export function Generator({ navigate }: { navigate: Navigate }) {
       <p className="muted">Enter a topic. Everything else — script, scenes, voice, animation, subtitles and export — is automatic.</p>
 
       <Card>
-        <Field label="Category" hint={motivation ? 'Cinematic black-and-gold shots, a deep narrator, a beat-synced soundtrack and huge words on screen.' : 'The white mascot tells a finance story with objects, charts and captions.'}>
+        <Field
+          label="Category"
+          hint={
+            motivation
+              ? 'Cinematic black-and-gold shots, a deep narrator, a beat-synced soundtrack and huge words on screen.'
+              : stick
+                ? 'Claude writes the script, then animates every shot in code (stick figures, bright cartoon world, whip transitions) and checks its own frames. Needs an Anthropic API key; about $1–3 per video.'
+                : 'The white mascot tells a finance story with objects, charts and captions.'
+          }
+        >
           <Segmented value={category} onChange={setCategory} options={CATEGORIES.map((c) => ({ value: c, label: CATEGORY_LABELS[c] }))} />
         </Field>
         <Field label="Topic" error={tooShort ? 'Topic is too short (min 8 characters).' : null} hint="One question or scenario works best.">
@@ -129,7 +144,7 @@ export function Generator({ navigate }: { navigate: Navigate }) {
           <Field label="Narration">
             <Segmented value={narrator} onChange={setNarrator} options={NARRATOR_OPTIONS.map((n) => ({ value: n, label: n === 'auto' ? 'Automatic' : n === 'male' ? 'Male' : 'Female' }))} />
           </Field>
-          {motivation ? (
+          {stick ? null : motivation ? (
             <Field label="Music" hint="Automatic picks the style that fits the theme (money/discipline → phonk, success → epic, mindset → piano).">
               <Select value={editMusic} onChange={setEditMusic} options={EDIT_MUSIC_STYLES.map((m) => ({ value: m, label: EDIT_MUSIC_LABELS[m] }))} />
             </Field>
