@@ -80,6 +80,7 @@ Output: one \`\`\`js code block and nothing else. The code:
 - Available globals: everything defined in the engine (drawStick, POSE, PAL, kf, ease, easeOut, backOut, lerp, inv, clamp, shake, rng, circle, ellipse, rrect, path, line, fillStroke, text, burst, star5, puff, sweat, sparkle, drawSky, drawSun, drawCloud, drawSea, applyCam, darkness, lightShaft, drawCrate, drawBarrel, drawChest, ik, C, walkLegs, walkArms, handheld, W, H, FPS, INK, TAU…), plus SHOTS and DURATION.
 
 Direction (the house style):
+- Keep the code compact: about 250–500 lines in total. Write reusable helpers (props, backgrounds, character presets) once and reuse them across shots instead of repeating drawing code.
 - About one setup every 2–4 s; a new idea gets a new setup. The hook starts in action on frame 1. One longer shot shows the mechanism.
 - Bright saturated palette, ink outlines (INK), soft contact shadows, slow push-ins with handheld drift (handheld(t)), an impact is a burst + shake + flash.
 - Stick people: drawStick(ctx, { x, y, s, flip, cols: PAL.red|blue|yellow|green|navy|purple, hat, arms, legs, face: { eyes, mouth, look, blink, brow… }, bob, lean, squash, alpha, sil }). y is the feet. Faces: eyes normal|wide|squint|happy|half|smug|spiral|x, mouth smile|grin|smirk|o|flat|frown|teeth. Use C(preset, overrides) to vary a preset. arms/legs take angle pairs or { ik: [x, y] } targets (see POSE and the example).

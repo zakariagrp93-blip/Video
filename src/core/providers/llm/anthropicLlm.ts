@@ -84,24 +84,32 @@ export class AnthropicLLMProvider extends RemoteLLMProvider {
       }).beta.messages.stream(
           {
             model: this.model,
-            max_tokens: 64000,
+            max_tokens: 48000,
             betas: ['server-side-fallback-2026-07-01'],
             fallbacks: 'default',
             // The engine reference is large and identical for every video: cache it.
             system: [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }],
             messages: [{ role: 'user', content }],
-            output_config: { effort: 'high' },
+            // 'medium' (the model's default) writes a full shot list in a few minutes; 'high' took far longer.
+            output_config: { effort: 'medium' },
           },
           // A full shot list can take 10+ minutes to write: don't let the client time out mid-answer.
           { signal: ctx.signal, timeout: 40 * 60 * 1000 },
         );
       let chars = 0;
       let last = 0;
+      let lastLog = Date.now();
+      const started = Date.now();
+      ctx.log.info(`Claude ${req.name}: request sent (${Math.round((req.system.length + req.prompt.length) / 1000)}k chars of prompt${req.images?.length ? `, ${req.images.length} image(s)` : ''})`);
       const tick = (phase: 'thinking' | 'writing') => {
         const now = Date.now();
         if (now - last > 800) {
           last = now;
           req.onProgress?.({ phase, chars });
+        }
+        if (now - lastLog > 60_000) {
+          lastLog = now;
+          ctx.log.info(`Claude ${req.name}: ${phase}, ${chars} chars after ${Math.round((now - started) / 1000)} s`);
         }
       };
       stream.on('streamEvent', (ev) => {
@@ -131,6 +139,7 @@ export class AnthropicLLMProvider extends RemoteLLMProvider {
       } finally {
         clearInterval(watchdog);
       }
+      ctx.log.info(`Claude ${req.name}: done in ${Math.round((Date.now() - started) / 1000)} s, ${response.usage.output_tokens} output tokens, stop ${response.stop_reason}`);
       ctx.usage({
         provider: 'anthropic',
         kind: 'llm',
